@@ -1,0 +1,16 @@
+import SwiftUI
+
+@main
+struct BibleTVApp: App {
+    var body: some Scene {
+        WindowGroup {
+            NavigationStack {
+                if Secrets.esvAPIKey.isEmpty {
+                    SetupView()
+                } else {
+                    BookListView()
+                }
+            }
+        }
+    }
+}
