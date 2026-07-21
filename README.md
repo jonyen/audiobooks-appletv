@@ -7,6 +7,10 @@ along, chapter by chapter.
 
 Derived from [bible-appletv](https://github.com/jonyen/bible-appletv).
 
+![Home screen with genre shelves and Continue Listening](docs/screenshots/home.png)
+
+![Book detail with chapter list and read-along match summary](docs/screenshots/book-detail.png)
+
 ## Features
 
 - **Browse** curated genre shelves (Fiction, Mystery, Sci-Fi, Children's,
