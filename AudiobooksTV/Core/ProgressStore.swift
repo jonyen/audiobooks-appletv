@@ -15,9 +15,12 @@ struct PlaybackProgress: Codable, Equatable, Hashable {
 final class ProgressStore: ObservableObject {
     static let shared = ProgressStore()
     private static let key = "playbackProgress.v1"
+    private static let finishedKey = "finishedSections.v1"
     private static let cap = 20
 
     @Published private(set) var items: [PlaybackProgress] = []
+    /// Finished section indexes per book ID. Feeds gold section titles.
+    @Published private(set) var finished: [Int: Set<Int>] = [:]
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -25,6 +28,10 @@ final class ProgressStore: ObservableObject {
         if let data = defaults.data(forKey: Self.key),
            let decoded = try? JSONDecoder().decode([PlaybackProgress].self, from: data) {
             items = decoded
+        }
+        if let data = defaults.data(forKey: Self.finishedKey),
+           let decoded = try? JSONDecoder().decode([Int: Set<Int>].self, from: data) {
+            finished = decoded
         }
     }
 
@@ -46,9 +53,40 @@ final class ProgressStore: ObservableObject {
         persist()
     }
 
+    func finishedSections(bookID: Int) -> Set<Int> {
+        finished[bookID] ?? []
+    }
+
+    func isFinished(bookID: Int, sectionIndex: Int) -> Bool {
+        finished[bookID]?.contains(sectionIndex) ?? false
+    }
+
+    func markFinished(bookID: Int, sectionIndex: Int) {
+        finished[bookID, default: []].insert(sectionIndex)
+        persistFinished()
+    }
+
+    func toggleFinished(bookID: Int, sectionIndex: Int) {
+        if isFinished(bookID: bookID, sectionIndex: sectionIndex) {
+            finished[bookID]?.remove(sectionIndex)
+            if finished[bookID]?.isEmpty == true {
+                finished.removeValue(forKey: bookID)
+            }
+        } else {
+            finished[bookID, default: []].insert(sectionIndex)
+        }
+        persistFinished()
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(items) {
             defaults.set(data, forKey: Self.key)
+        }
+    }
+
+    private func persistFinished() {
+        if let data = try? JSONEncoder().encode(finished) {
+            defaults.set(data, forKey: Self.finishedKey)
         }
     }
 }

@@ -44,4 +44,39 @@ final class ProgressStoreTests: XCTestCase {
         store.remove(bookID: 7)
         XCTAssertNil(store.progress(for: 7))
     }
+
+    func testMarkAndReadFinishedSections() {
+        let defaults = UserDefaults(suiteName: "test.finished.\(UUID().uuidString)")!
+        let store = ProgressStore(defaults: defaults)
+
+        XCTAssertEqual(store.finishedSections(bookID: 7), [])
+        XCTAssertFalse(store.isFinished(bookID: 7, sectionIndex: 2))
+
+        store.markFinished(bookID: 7, sectionIndex: 2)
+        store.markFinished(bookID: 7, sectionIndex: 2)  // idempotent
+        store.markFinished(bookID: 7, sectionIndex: 5)
+
+        XCTAssertEqual(store.finishedSections(bookID: 7), [2, 5])
+        XCTAssertTrue(store.isFinished(bookID: 7, sectionIndex: 2))
+        XCTAssertEqual(store.finishedSections(bookID: 8), [])
+    }
+
+    func testToggleFinished() {
+        let defaults = UserDefaults(suiteName: "test.toggle.\(UUID().uuidString)")!
+        let store = ProgressStore(defaults: defaults)
+
+        store.toggleFinished(bookID: 3, sectionIndex: 1)
+        XCTAssertTrue(store.isFinished(bookID: 3, sectionIndex: 1))
+        store.toggleFinished(bookID: 3, sectionIndex: 1)
+        XCTAssertFalse(store.isFinished(bookID: 3, sectionIndex: 1))
+    }
+
+    func testFinishedSectionsPersistAcrossInstances() {
+        let suite = "test.persist.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        ProgressStore(defaults: defaults).markFinished(bookID: 9, sectionIndex: 0)
+
+        let reloaded = ProgressStore(defaults: UserDefaults(suiteName: suite)!)
+        XCTAssertEqual(reloaded.finishedSections(bookID: 9), [0])
+    }
 }
