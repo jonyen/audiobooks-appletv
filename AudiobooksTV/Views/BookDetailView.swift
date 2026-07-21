@@ -5,12 +5,17 @@ struct BookDetailView: View {
 
     @StateObject private var textModel = BookTextModel()
     @State private var playTarget: PlayTarget?
+    @ObservedObject private var progressStore = ProgressStore.shared
 
     private struct PlayTarget: Identifiable, Hashable {
         let id = UUID()
         let sectionIndex: Int
         let seconds: Double
     }
+
+    /// Finished sections render in a warm gold instead of the default label
+    /// color, matching BibleTV's read-chapter treatment.
+    private static let finishedColor = Color(red: 0.87, green: 0.72, blue: 0.4)
 
     private var savedProgress: PlaybackProgress? {
         ProgressStore.shared.progress(for: book.id)
@@ -78,6 +83,10 @@ struct BookDetailView: View {
                     } label: {
                         HStack {
                             Text(section.title)
+                                .foregroundStyle(
+                                    progressStore.isFinished(bookID: book.id, sectionIndex: index)
+                                        ? Self.finishedColor : Color.primary
+                                )
                             Spacer()
                             Text(timeString(section.playtimeSeconds))
                                 .foregroundStyle(.secondary)
