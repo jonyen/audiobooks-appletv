@@ -45,4 +45,12 @@ final class ChapterSplitterTests: XCTestCase {
         XCTAssertEqual(chapters[0].title, "Full Text")
         XCTAssertEqual(chapters[0].body, text)
     }
+
+    func testHandlesCRLFLineEndings() {
+        let text = "CHAPTER I\r\n\r\nfirst body\r\n\r\nCHAPTER II\r\n\r\nsecond body"
+        let chapters = ChapterSplitter.split(text)
+        XCTAssertEqual(chapters.count, 2)
+        XCTAssertEqual(chapters[0].title, "CHAPTER I")
+        XCTAssertEqual(chapters[1].body, "second body")
+    }
 }

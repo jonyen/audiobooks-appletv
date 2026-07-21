@@ -10,7 +10,8 @@ enum ChapterSplitter {
     /// A heading is a short line, preceded by a blank line (or text start),
     /// matching a chapter-keyword pattern or a bare Roman/Arabic numeral.
     static func split(_ text: String) -> [TextChapter] {
-        let lines = text.components(separatedBy: "\n")
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let lines = normalized.components(separatedBy: "\n")
         var headingIndices: [Int] = []
 
         for (i, line) in lines.enumerated() {
@@ -23,7 +24,7 @@ enum ChapterSplitter {
         }
 
         guard headingIndices.count >= 2 else {
-            return [TextChapter(title: "Full Text", body: text)]
+            return [TextChapter(title: "Full Text", body: normalized)]
         }
 
         var chapters: [TextChapter] = []
