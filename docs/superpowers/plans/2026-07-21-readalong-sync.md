@@ -8,6 +8,8 @@
 
 **Tech Stack:** Swift 5.9, SwiftUI (tvOS 18 `ScrollPosition`), SPM test target `AudiobooksCoreTests` (runs on macOS via `swift test`), XcodeBuildMCP for simulator builds.
 
+> **Deviation:** The app targets tvOS 17, not 18, so the `ScrollPosition`/`scrollTo(y:)` API isn't available. The implementation instead uses `.scrollPosition(id:anchor: .top)` with `.scrollTargetLayout()` and no `PreferenceKey` frame tracking. See Task 3.
+
 ## Global Constraints
 
 - Spec: `docs/superpowers/specs/2026-07-21-readalong-sync-design.md`
@@ -298,6 +300,8 @@ git commit -m "feat: persist finished sections per book in ProgressStore"
 ---
 
 ### Task 3: PlayerView read-along sync (paragraph highlight + auto-scroll)
+
+> **Deviation:** The steps below describe the tvOS 18 `ScrollPosition`/`scrollTo(y:)` + `PreferenceKey` frame-tracking approach originally planned. Since the app targets tvOS 17, the actual implementation uses `.scrollPosition(id:anchor: .top)` on the paragraph `VStack` (with `.scrollTargetLayout()`) and drives it from `scrollPositionID`/`.id(index)` instead — no frame tracking.
 
 **Files:**
 - Modify: `AudiobooksTV/Views/PlayerView.swift`

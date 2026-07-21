@@ -51,6 +51,9 @@ Lives in the SPM `AudiobooksCore` target with unit tests.
 - Auto-scroll with `ScrollPosition`, targeting the narrated paragraph's
   frame top (collected via a `PreferenceKey` of paragraph frames in a
   named coordinate space), animated ease-in-out 0.6s.
+  **Deviation:** the app targets tvOS 17, so the implementation uses
+  `.scrollPosition(id:anchor: .top)` with `.scrollTargetLayout()` instead,
+  scrolling to the narrated paragraph's `.id(index)` with no frame tracking.
 - A user-driven focus change between paragraphs during playback sets
   `followSuspendedUntil = now + 10s`; programmatic focus handoff at play
   start is exempt (`suppressFocusSuspension` flag); focus dropping to nil

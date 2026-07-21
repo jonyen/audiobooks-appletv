@@ -90,7 +90,16 @@ struct PlayerView: View {
             updateParagraphs()
             await startAudio()
         }
-        .onReceive(textModel.$chapters) { _ in
+        // Subscribe to `state`, not `chapters`, because @Published emits
+        // during willSet: a $chapters emission fires before `chapters` (and
+        // the later-assigned `alignment`) actually hold their new values,
+        // which left late-arriving text unable to ever populate
+        // `paragraphs`. `state` is the last property BookTextModel.load()
+        // assigns on every path (success, unavailable, and cancellation), so
+        // by the time this fires, chapters/alignment are fully settled.
+        // dropFirst() skips the initial replay of the current value at
+        // subscription time, which .task(id:) already handles.
+        .onReceive(textModel.$state.dropFirst()) { _ in
             updateParagraphs()
         }
         .onChange(of: audio.duration) {
@@ -258,6 +267,7 @@ struct PlayerView: View {
                         .id(index)
                 }
             }
+            .scrollTargetLayout()
             .frame(maxWidth: 1200, alignment: .leading)
             .padding(.horizontal, 64)
             .padding(.top, Self.contentTopInset)
