@@ -39,4 +39,12 @@ final class GutenbergTextTests: XCTestCase {
         XCTAssertEqual(GutenbergText.stripBoilerplate(variant), "body")
         XCTAssertEqual(GutenbergText.stripBoilerplate("no markers at all"), "no markers at all")
     }
+
+    func testStripsBoilerplateWithCRLF() {
+        let raw = "header junk\r\n*** START OF THE PROJECT GUTENBERG EBOOK JANE EYRE ***\r\n\r\nCHAPTER I\r\n\r\nThere was no possibility.\r\n\r\n*** END OF THE PROJECT GUTENBERG EBOOK JANE EYRE ***\r\nfooter junk"
+        let stripped = GutenbergText.stripBoilerplate(raw)
+        XCTAssertTrue(stripped.hasPrefix("CHAPTER I"), "got: \(stripped.prefix(40))")
+        XCTAssertTrue(stripped.hasSuffix("There was no possibility."))
+        XCTAssertFalse(stripped.contains("footer"))
+    }
 }

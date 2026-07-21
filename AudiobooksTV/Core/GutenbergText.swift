@@ -22,7 +22,9 @@ enum GutenbergText {
     /// Removes the Project Gutenberg license header and footer, keeping only
     /// the book body. Texts without markers are returned trimmed but intact.
     static func stripBoilerplate(_ raw: String) -> String {
-        var text = raw
+        // CRLF endings break the [^\n]* marker patterns (a \r\n grapheme
+        // straddles the match boundary), so normalize before matching.
+        var text = raw.replacingOccurrences(of: "\r\n", with: "\n")
         if let start = text.range(
             of: #"\*\*\* ?START OF TH(E|IS) PROJECT GUTENBERG EBOOK[^\n]*"#,
             options: [.regularExpression, .caseInsensitive]
