@@ -35,14 +35,23 @@ enum AudioAnalyzer {
         var samplesInWindow = 0
 
         while let buffer = output.copyNextSampleBuffer() {
-            try Task.checkCancellation()
+            if Task.isCancelled {
+                reader.cancelReading()
+                throw CancellationError()
+            }
             guard let block = CMSampleBufferGetDataBuffer(buffer) else { continue }
             var totalLength = 0
+            var lengthAtOffset = 0
             var pointer: UnsafeMutablePointer<CChar>?
             guard CMBlockBufferGetDataPointer(
-                block, atOffset: 0, lengthAtOffsetOut: nil,
+                block, atOffset: 0, lengthAtOffsetOut: &lengthAtOffset,
                 totalLengthOut: &totalLength, dataPointerOut: &pointer
             ) == kCMBlockBufferNoErr, let pointer else { continue }
+            // AVAssetReader's LPCM output is contiguous in practice, but
+            // guard against a non-contiguous block buffer rather than
+            // reading `totalLength` bytes through a pointer that's only
+            // valid for `lengthAtOffset` of them.
+            guard lengthAtOffset == totalLength else { continue }
 
             let sampleCount = totalLength / MemoryLayout<Float>.size
             pointer.withMemoryRebound(to: Float.self, capacity: sampleCount) { samples in

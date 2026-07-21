@@ -6,6 +6,15 @@ import Foundation
 /// preamble end is the end of the longest silence whose end falls within
 /// [minEnd, maxEnd] — narrators leave their largest pause between the
 /// credits and the chapter text.
+///
+/// A silence run that is still open when the window array ends is dropped,
+/// never scored: we can't tell whether it's a genuine pause (that keeps
+/// going past our analysis window) or the end of the analyzed clip/section
+/// (e.g. a short section, or the 60s decode cutoff cutting a run off
+/// mid-silence). Treating that ambiguous, array-end-truncated run as "the"
+/// preamble boundary has caused the detector to report an offset near the
+/// end of short sections, which then makes the player seek to the end and
+/// auto-advance skip the section outright.
 enum PreambleDetector {
     static let silenceFloorFraction: Float = 0.2
     static let minSilence = 0.8
@@ -19,6 +28,8 @@ enum PreambleDetector {
         let floor = nonZero[nonZero.count / 2] * silenceFloorFraction
 
         // Collect maximal runs of silent windows as (startIndex, count).
+        // A run still open when the loop ends touches the array end and is
+        // intentionally dropped — see the doc comment above.
         var runs: [(start: Int, count: Int)] = []
         var runStart: Int?
         for (index, rms) in windowRMS.enumerated() {
@@ -28,9 +39,6 @@ enum PreambleDetector {
                 runs.append((start, index - start))
                 runStart = nil
             }
-        }
-        if let start = runStart {
-            runs.append((start, windowRMS.count - start))
         }
 
         let qualifying = runs.filter { run in

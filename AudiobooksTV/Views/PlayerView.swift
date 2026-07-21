@@ -17,6 +17,7 @@ struct PlayerView: View {
     @State private var pendingSeekSeconds: Double
     @State private var lastSavedSeconds: Double = 0
     @State private var preambleOffset: Double = 0
+    @State private var preambleTask: Task<Void, Never>?
 
     @State private var paragraphs: [String] = []
     @State private var timeline: ParagraphTimeline?
@@ -88,6 +89,7 @@ struct PlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.09, green: 0.09, blue: 0.11))
         .task(id: sectionIndex) {
+            preambleTask?.cancel()
             preambleOffset = 0
             updateParagraphs()
             await startAudio()
@@ -114,6 +116,7 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
+            preambleTask?.cancel()
             saveProgress(seconds: audio.currentTime)
             audio.stop()
         }
@@ -342,7 +345,18 @@ struct PlayerView: View {
             saveProgress(seconds: audio.currentTime)
             if freshStart {
                 let analyzedSection = sectionIndex
-                Task { await resolvePreambleSkip(fileURL: fileURL, analyzedSection: analyzedSection) }
+                preambleTask = Task { await resolvePreambleSkip(fileURL: fileURL, analyzedSection: analyzedSection) }
+            } else {
+                // Resuming mid-section (not starting from 0): apply any
+                // already-cached leadIn to the read-along timeline so
+                // highlighting doesn't drift by the preamble length, but
+                // never seek — the resume position already came from saved
+                // progress. Cache-only; no analysis runs here.
+                let sectionID = "\(book.id).\(sectionIndex)"
+                if let cachedOffset = PreambleOffsetStore.shared.offset(sectionID: sectionID), cachedOffset > 0 {
+                    preambleOffset = cachedOffset
+                    rebuildTimeline()
+                }
             }
             if !paragraphs.isEmpty {
                 suppressFocusSuspension = true
@@ -375,6 +389,17 @@ struct PlayerView: View {
         guard let offset, offset > 0, sectionIndex == analyzedSection else { return }
         preambleOffset = offset
         rebuildTimeline()
+        // Sanity clamp mirroring ParagraphTimeline's own leadIn clamp: never
+        // seek past the midpoint of the file. A detector or cache bug that
+        // produces a bogus large offset must not be able to seek playback
+        // to (or near) the end of the section — the timeline still clamps
+        // itself against `preambleOffset`, so leaving it set is harmless.
+        guard audio.duration > 0, offset <= audio.duration * 0.5 else { return }
+        // `audio.currentTime < offset` stands in for "the user hasn't
+        // manually seeked yet" — there's no scrub gesture in this player
+        // today. Revisit this check if scrubbing is ever added, since a
+        // deliberate seek back into the preamble would then also read as
+        // "hasn't seeked" and get silently overridden.
         if audio.currentTime < offset {
             audio.seek(to: offset)
         }

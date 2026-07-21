@@ -42,11 +42,13 @@ final class PreambleDetectorTests: XCTestCase {
                        18.0, accuracy: 0.11)
     }
 
-    func testTrailingSilenceRunEndsAtArrayEnd() {
-        // 10s speech followed by 2s silence with nothing after it.
-        // Silence run extends to end of array and qualifies (2s > minSilence, ends at 12.0 within [8, 60]).
+    func testIgnoresSilenceRunTouchingArrayEnd() {
+        // 10s speech followed by 2s silence with nothing after it — the run
+        // is still open when the array ends. It must NOT be treated as the
+        // preamble boundary: for a short section this silence is simply the
+        // clip's trailing silence (or, for longer files, a run truncated by
+        // the analysis window), not a pause before the chapter text.
         let rms = windows([(1.0, 10), (0.0, 2)])
-        XCTAssertEqual(PreambleDetector.preambleEnd(windowRMS: rms, windowDuration: 0.1)!,
-                       12.0, accuracy: 0.11)
+        XCTAssertNil(PreambleDetector.preambleEnd(windowRMS: rms, windowDuration: 0.1))
     }
 }
