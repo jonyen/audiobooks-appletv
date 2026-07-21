@@ -26,6 +26,19 @@ struct SearchView: View {
                 }
                 .padding(.top, 120)
             } else {
+                HStack {
+                    Button {
+                        readAlongOnly.toggle()
+                    } label: {
+                        Label("Read-along only",
+                              systemImage: readAlongOnly ? "checkmark.circle.fill" : "circle")
+                    }
+                    .font(.caption)
+                    Spacer()
+                }
+                .padding(.horizontal, 64)
+                .padding(.top, 32)
+
                 LazyVGrid(columns: columns, spacing: 48) {
                     ForEach(visibleResults) { book in
                         NavigationLink(value: book) {
@@ -39,9 +52,6 @@ struct SearchView: View {
         }
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Title or author")
-        .toolbar {
-            Toggle("Read-along only", isOn: $readAlongOnly)
-        }
         .onSubmit(of: .search) {
             Task { await search() }
         }

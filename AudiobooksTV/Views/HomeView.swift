@@ -7,6 +7,18 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Button {
+                        readAlongOnly.toggle()
+                    } label: {
+                        Label("Read-along only",
+                              systemImage: readAlongOnly ? "checkmark.circle.fill" : "circle")
+                    }
+                    .font(.caption)
+                    Spacer()
+                }
+                .padding(.horizontal, 64)
+
                 if !progressStore.items.isEmpty {
                     continueListeningRow
                 }
@@ -25,7 +37,6 @@ struct HomeView: View {
         }
         .toolbar {
             ToolbarItemGroup {
-                Toggle("Read-along only", isOn: $readAlongOnly)
                 NavigationLink {
                     SearchView()
                 } label: {

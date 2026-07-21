@@ -44,6 +44,8 @@ struct PlayerView: View {
 
         }
         .navigationTitle(section.title)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(red: 0.09, green: 0.09, blue: 0.11))
         .task(id: sectionIndex) {
             await startAudio()
         }
