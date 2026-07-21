@@ -41,4 +41,12 @@ final class PreambleDetectorTests: XCTestCase {
         XCTAssertEqual(PreambleDetector.preambleEnd(windowRMS: rms, windowDuration: 0.1)!,
                        18.0, accuracy: 0.11)
     }
+
+    func testTrailingSilenceRunEndsAtArrayEnd() {
+        // 10s speech followed by 2s silence with nothing after it.
+        // Silence run extends to end of array and qualifies (2s > minSilence, ends at 12.0 within [8, 60]).
+        let rms = windows([(1.0, 10), (0.0, 2)])
+        XCTAssertEqual(PreambleDetector.preambleEnd(windowRMS: rms, windowDuration: 0.1)!,
+                       12.0, accuracy: 0.11)
+    }
 }
