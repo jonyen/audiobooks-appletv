@@ -18,6 +18,7 @@ struct PlayerView: View {
     @State private var lastSavedSeconds: Double = 0
     @State private var preambleOffset: Double = 0
     @State private var preambleTask: Task<Void, Never>?
+    @State private var pendingSkipOffset: Double?
 
     @State private var paragraphs: [String] = []
     @State private var timeline: ParagraphTimeline?
@@ -91,6 +92,7 @@ struct PlayerView: View {
         .task(id: sectionIndex) {
             preambleTask?.cancel()
             preambleOffset = 0
+            pendingSkipOffset = nil
             updateParagraphs()
             await startAudio()
         }
@@ -108,6 +110,15 @@ struct PlayerView: View {
         }
         .onChange(of: audio.duration) {
             rebuildTimeline()
+            // Duration is published by a periodic time observer and reads 0
+            // immediately after audio.load(); resolvePreambleSkip may have
+            // run before it arrived (the common case on a cache hit, which
+            // has no suspension point before the seek decision). Once
+            // duration is known, perform the seek it deferred.
+            if let offset = pendingSkipOffset, audio.duration > 0 {
+                pendingSkipOffset = nil
+                performClampedSeek(offset: offset)
+            }
         }
         .onChange(of: audio.currentTime) { _, newTime in
             currentParagraphIndex = timeline?.paragraphIndex(at: newTime)
@@ -381,6 +392,13 @@ struct PlayerView: View {
             let windows = (try? await AudioAnalyzer.rmsWindows(
                 fileURL: fileURL, windowDuration: 0.05, limit: 60
             )) ?? []
+            // Cancellation (section change or view dismissal) must never
+            // save a result: AudioAnalyzer throws on cancellation, `try?`
+            // above swallows that into an empty `windows`, and — since
+            // dismissal alone doesn't change `sectionIndex` — the guard
+            // below would otherwise pass and permanently cache the bogus
+            // "0, nothing to skip" sentinel for this section.
+            guard !Task.isCancelled else { return }
             guard sectionIndex == analyzedSection else { return }
             let detected = PreambleDetector.preambleEnd(windowRMS: windows, windowDuration: 0.05) ?? 0
             PreambleOffsetStore.shared.save(offset: detected, sectionID: sectionID)
@@ -389,6 +407,21 @@ struct PlayerView: View {
         guard let offset, offset > 0, sectionIndex == analyzedSection else { return }
         preambleOffset = offset
         rebuildTimeline()
+        // `audio.duration` is published by a periodic time observer and is
+        // still 0 immediately after audio.load() — on a cache hit there's
+        // no suspension point before this runs, so duration is reliably
+        // unknown here. Defer the seek to .onChange(of: audio.duration)
+        // once it's known rather than silently giving up.
+        if audio.duration > 0 {
+            performClampedSeek(offset: offset)
+        } else {
+            pendingSkipOffset = offset
+        }
+    }
+
+    /// Seeks past the preamble, but only if the offset still looks sane
+    /// relative to the now-known duration and playback hasn't moved past it.
+    private func performClampedSeek(offset: Double) {
         // Sanity clamp mirroring ParagraphTimeline's own leadIn clamp: never
         // seek past the midpoint of the file. A detector or cache bug that
         // produces a bogus large offset must not be able to seek playback
