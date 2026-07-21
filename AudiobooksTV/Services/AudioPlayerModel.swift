@@ -87,6 +87,14 @@ final class AudioPlayerModel: ObservableObject {
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
     }
 
+    /// Absolute seek for restoring a saved position. Unlike skip(by:), this
+    /// does not clamp to `duration`, which is still 0 right after load —
+    /// AVPlayer queues the seek and applies it once the item is ready.
+    func seek(to seconds: Double) {
+        guard let player, seconds > 0 else { return }
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+    }
+
     func cycleRate() {
         let index = Self.rates.firstIndex(of: rate) ?? 0
         rate = Self.rates[(index + 1) % Self.rates.count]

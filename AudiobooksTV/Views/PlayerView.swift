@@ -212,7 +212,7 @@ struct PlayerView: View {
             audio.onChapterFinished = sectionFinished
             audio.load(fileURL: fileURL, autoplay: true)
             if pendingSeekSeconds > 0 {
-                audio.skip(by: pendingSeekSeconds)
+                audio.seek(to: pendingSeekSeconds)
                 pendingSeekSeconds = 0
             }
             saveProgress(seconds: audio.currentTime)
