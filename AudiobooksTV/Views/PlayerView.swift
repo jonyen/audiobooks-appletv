@@ -26,6 +26,17 @@ struct PlayerView: View {
     @State private var controlsRevealed = false
     @State private var scrollPositionID: Int?
 
+    @ObservedObject private var progressStore = ProgressStore.shared
+
+    /// Controls stay visible while paused; during playback they collapse
+    /// away entirely and only an explicit up-press at the top of the text
+    /// reveals them. Loss of focus alone must NOT reveal them — auto-scroll
+    /// can push the focused paragraph off-screen, which resets focus to nil
+    /// without any user intent.
+    private var controlsVisible: Bool {
+        !audio.isPlaying || controlsRevealed
+    }
+
     /// Top padding of the read-along content.
     private static let contentTopInset: CGFloat = 48
 
@@ -42,18 +53,35 @@ struct PlayerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            controlBar
-                .padding(.horizontal, 64)
-                .padding(.vertical, 24)
+            if controlsVisible {
+                controlBar
+                    .padding(.horizontal, 64)
+                    .padding(.vertical, 24)
 
-            progressBar
-                .padding(.horizontal, 64)
-                .padding(.bottom, 16)
+                progressBar
+                    .padding(.horizontal, 64)
+                    .padding(.bottom, 16)
+            }
 
             Divider()
 
             textBody
 
+        }
+        .animation(.easeInOut(duration: 0.25), value: controlsVisible)
+        .onPlayPauseCommand {
+            audio.togglePlayPause()
+            if !audio.isPlaying {
+                saveProgress(seconds: audio.currentTime)
+            }
+        }
+        .onMoveCommand { direction in
+            // Fires only when the focus engine has no target in that
+            // direction — i.e. pressing up at the top of the text while the
+            // controls are collapsed. Reveal them.
+            if direction == .up {
+                controlsRevealed = true
+            }
         }
         .navigationTitle(section.title)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -141,6 +169,21 @@ struct PlayerView: View {
                     .labelStyle(.iconOnly)
             }
             .foregroundStyle(autoAdvance ? .primary : .tertiary)
+
+            Button {
+                ProgressStore.shared.toggleFinished(bookID: book.id, sectionIndex: sectionIndex)
+            } label: {
+                let isFinished = progressStore.isFinished(bookID: book.id, sectionIndex: sectionIndex)
+                Label(
+                    isFinished ? "Mark as Unfinished" : "Mark as Finished",
+                    systemImage: isFinished ? "checkmark.circle.fill" : "checkmark.circle"
+                )
+                .labelStyle(.iconOnly)
+            }
+            .foregroundStyle(
+                progressStore.isFinished(bookID: book.id, sectionIndex: sectionIndex)
+                    ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary)
+            )
         }
         .font(.title3)
     }
@@ -298,6 +341,7 @@ struct PlayerView: View {
     }
 
     private func sectionFinished() {
+        ProgressStore.shared.markFinished(bookID: book.id, sectionIndex: sectionIndex)
         guard autoAdvance, sectionIndex < book.sections.count - 1 else { return }
         sectionIndex += 1
     }
