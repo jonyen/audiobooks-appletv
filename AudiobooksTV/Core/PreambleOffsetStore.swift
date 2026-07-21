@@ -1,0 +1,26 @@
+import Foundation
+
+/// Caches detected preamble offsets per audio section so silence analysis
+/// runs at most once per section. A stored 0 means "analyzed, nothing to
+/// skip"; a missing key means "never analyzed".
+final class PreambleOffsetStore {
+    static let shared = PreambleOffsetStore()
+    private static let key = "preambleOffsets.v1"
+
+    private var offsets: [String: Double]
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        offsets = (defaults.dictionary(forKey: Self.key) as? [String: Double]) ?? [:]
+    }
+
+    func offset(sectionID: String) -> Double? {
+        offsets[sectionID]
+    }
+
+    func save(offset: Double, sectionID: String) {
+        offsets[sectionID] = offset
+        defaults.set(offsets, forKey: Self.key)
+    }
+}
