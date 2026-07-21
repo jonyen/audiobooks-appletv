@@ -22,7 +22,7 @@ struct PlayerView: View {
         self.textModel = textModel
         self.startSectionIndex = startSectionIndex
         self.startSeconds = startSeconds
-        _sectionIndex = State(initialValue: startSectionIndex)
+        _sectionIndex = State(initialValue: min(max(0, startSectionIndex), max(0, book.sections.count - 1)))
         _pendingSeekSeconds = State(initialValue: startSeconds)
     }
 
@@ -207,6 +207,8 @@ struct PlayerView: View {
     // MARK: Actions
 
     private func startAudio() async {
+        audio.pause()
+        errorMessage = nil
         isLoadingAudio = true
         defer { isLoadingAudio = false }
         do {
@@ -219,7 +221,9 @@ struct PlayerView: View {
             }
             saveProgress(seconds: audio.currentTime)
         } catch is CancellationError {
-            // View went away; nothing to do.
+            // View went away or section changed; nothing to do.
+        } catch let error as URLError where error.code == .cancelled {
+            // Same: the in-flight download was cancelled by a newer task.
         } catch {
             errorMessage = error.localizedDescription
         }

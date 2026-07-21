@@ -33,7 +33,8 @@ final class BookTextModel: ObservableObject {
             self.chapters = chapters
             self.alignment = SectionAligner.align(
                 sectionTitles: book.sections.map(\.title),
-                chapterTitles: chapters.map(\.title)
+                chapterTitles: chapters.map(\.title),
+                chapterBodies: chapters.map(\.body)
             )
             state = .loaded
         } catch is CancellationError {
@@ -47,6 +48,7 @@ final class BookTextModel: ObservableObject {
     /// (caller falls back to the whole-book scroll).
     func chapter(forSectionIndex index: Int) -> TextChapter? {
         guard let alignment,
+              index >= 0,
               index < alignment.chapterIndexBySection.count,
               let chapterIndex = alignment.chapterIndexBySection[index],
               chapterIndex < chapters.count else { return nil }
