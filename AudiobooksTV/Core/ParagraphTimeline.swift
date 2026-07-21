@@ -26,16 +26,20 @@ struct ParagraphTimeline {
             .filter { !$0.isEmpty }
     }
 
-    init?(paragraphs: [String], duration: Double) {
+    init?(paragraphs: [String], duration: Double, leadIn: Double = 0) {
         guard duration.isFinite, duration > 0, !paragraphs.isEmpty else { return nil }
         let counts = paragraphs.map(\.count)
         let total = counts.reduce(0, +)
         guard total > 0 else { return nil }
 
-        var start = 0.0
+        // A preamble is never half the section; clamping keeps a bogus
+        // cached offset from wrecking the whole timeline.
+        let clampedLeadIn = min(max(0, leadIn), duration * 0.5)
+        let spoken = duration - clampedLeadIn
+        var start = clampedLeadIn
         var entries: [Entry] = []
         for count in counts {
-            let length = duration * Double(count) / Double(total)
+            let length = spoken * Double(count) / Double(total)
             entries.append(Entry(start: start, end: start + length))
             start += length
         }
@@ -47,7 +51,7 @@ struct ParagraphTimeline {
     /// to the last.
     func paragraphIndex(at seconds: Double) -> Int? {
         guard let last = entries.last else { return nil }
-        if seconds < 0 { return 0 }
+        if let first = entries.first, seconds < first.start { return 0 }
         if seconds >= last.end { return entries.count - 1 }
         return entries.firstIndex { seconds >= $0.start && seconds < $0.end }
     }
