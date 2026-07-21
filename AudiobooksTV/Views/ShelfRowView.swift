@@ -23,7 +23,7 @@ struct ShelfRowView: View {
                         ProgressView()
                             .frame(height: 280)
                     }
-                    if failed {
+                    if failed && books.isEmpty {
                         Text("Couldn't load this shelf.")
                             .foregroundStyle(.secondary)
                             .frame(height: 280)
@@ -43,6 +43,7 @@ struct ShelfRowView: View {
             guard books.isEmpty else { return }
             do {
                 books = try await LibriVoxClient.shared.books(genre: shelf.id)
+                failed = false
             } catch {
                 failed = true
             }
