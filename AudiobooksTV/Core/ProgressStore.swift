@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-struct PlaybackProgress: Codable, Equatable {
+struct PlaybackProgress: Codable, Equatable, Hashable {
     let bookID: Int
     let bookTitle: String
     let coverURL: URL?
