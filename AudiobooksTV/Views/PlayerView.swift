@@ -24,7 +24,6 @@ struct PlayerView: View {
     @State private var followSuspendedUntil = Date.distantPast
     @State private var suppressFocusSuspension = false
     @State private var controlsRevealed = false
-    @State private var paragraphFrames: [Int: CGRect] = [:]
     @State private var scrollPositionID: Int?
 
     /// Top padding of the read-along content.
@@ -214,16 +213,8 @@ struct PlayerView: View {
                         .focusable()
                         .focused($focusedParagraph, equals: index)
                         .id(index)
-                        .background(GeometryReader { geo in
-                            Color.clear.preference(
-                                key: ParagraphFramesKey.self,
-                                value: [index: geo.frame(in: .named("readAlongContent"))]
-                            )
-                        })
                 }
             }
-            .coordinateSpace(name: "readAlongContent")
-            .onPreferenceChange(ParagraphFramesKey.self) { paragraphFrames = $0 }
             .frame(maxWidth: 1200, alignment: .leading)
             .padding(.horizontal, 64)
             .padding(.top, Self.contentTopInset)
@@ -337,10 +328,18 @@ struct PlayerView: View {
         } else {
             paragraphs = []
         }
-        paragraphFrames = [:]
         currentParagraphIndex = nil
         followSuspendedUntil = .distantPast
+        scrollPositionID = nil
         rebuildTimeline()
+        // Text can finish loading after audio has already started (e.g. the
+        // Gutenberg fetch was still in flight): hand focus to the text now
+        // so highlighting starts from a clean focus state, same as the
+        // handoff in startAudio().
+        if audio.isPlaying, focusedParagraph == nil, !paragraphs.isEmpty {
+            suppressFocusSuspension = true
+            focusedParagraph = 0
+        }
     }
 
     private func rebuildTimeline() {
@@ -353,19 +352,9 @@ struct PlayerView: View {
     private func scrollToNarratedParagraph() {
         guard audio.isPlaying,
               Date() >= followSuspendedUntil,
-              let index = currentParagraphIndex,
-              paragraphFrames[index] != nil else { return }
+              let index = currentParagraphIndex else { return }
         withAnimation(.easeInOut(duration: 0.6)) {
             scrollPositionID = index
         }
-    }
-}
-
-/// Collects each paragraph's frame (in read-along content coordinates) so
-/// the player can scroll the narrated paragraph to the top.
-private struct ParagraphFramesKey: PreferenceKey {
-    static var defaultValue: [Int: CGRect] { [:] }
-    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
-        value.merge(nextValue()) { _, new in new }
     }
 }
