@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct BibleTVApp: App {
+struct AudiobooksTVApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack {
