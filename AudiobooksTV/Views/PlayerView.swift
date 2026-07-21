@@ -16,6 +16,7 @@ struct PlayerView: View {
     @State private var autoAdvance = true
     @State private var pendingSeekSeconds: Double
     @State private var lastSavedSeconds: Double = 0
+    @State private var preambleOffset: Double = 0
 
     @State private var paragraphs: [String] = []
     @State private var timeline: ParagraphTimeline?
@@ -87,6 +88,7 @@ struct PlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.09, green: 0.09, blue: 0.11))
         .task(id: sectionIndex) {
+            preambleOffset = 0
             updateParagraphs()
             await startAudio()
         }
@@ -324,6 +326,7 @@ struct PlayerView: View {
     // MARK: Actions
 
     private func startAudio() async {
+        let freshStart = pendingSeekSeconds == 0
         audio.pause()
         errorMessage = nil
         isLoadingAudio = true
@@ -337,6 +340,10 @@ struct PlayerView: View {
                 pendingSeekSeconds = 0
             }
             saveProgress(seconds: audio.currentTime)
+            if freshStart {
+                let analyzedSection = sectionIndex
+                Task { await resolvePreambleSkip(fileURL: fileURL, analyzedSection: analyzedSection) }
+            }
             if !paragraphs.isEmpty {
                 suppressFocusSuspension = true
                 focusedParagraph = 0
@@ -347,6 +354,29 @@ struct PlayerView: View {
             // Same: the in-flight download was cancelled by a newer task.
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Looks up or computes the section's preamble offset, then jumps past
+    /// the spoken credits if playback is still inside them. Bails silently
+    /// if the section changed while analyzing.
+    private func resolvePreambleSkip(fileURL: URL, analyzedSection: Int) async {
+        let sectionID = "\(book.id).\(analyzedSection)"
+        var offset = PreambleOffsetStore.shared.offset(sectionID: sectionID)
+        if offset == nil {
+            let windows = (try? await AudioAnalyzer.rmsWindows(
+                fileURL: fileURL, windowDuration: 0.05, limit: 60
+            )) ?? []
+            guard sectionIndex == analyzedSection else { return }
+            let detected = PreambleDetector.preambleEnd(windowRMS: windows, windowDuration: 0.05) ?? 0
+            PreambleOffsetStore.shared.save(offset: detected, sectionID: sectionID)
+            offset = detected
+        }
+        guard let offset, offset > 0, sectionIndex == analyzedSection else { return }
+        preambleOffset = offset
+        rebuildTimeline()
+        if audio.currentTime < offset {
+            audio.seek(to: offset)
         }
     }
 
@@ -397,7 +427,7 @@ struct PlayerView: View {
     }
 
     private func rebuildTimeline() {
-        timeline = ParagraphTimeline(paragraphs: paragraphs, duration: audio.duration)
+        timeline = ParagraphTimeline(paragraphs: paragraphs, duration: audio.duration, leadIn: preambleOffset)
         currentParagraphIndex = timeline?.paragraphIndex(at: audio.currentTime)
     }
 
