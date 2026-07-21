@@ -17,6 +17,19 @@ struct PlayerView: View {
     @State private var pendingSeekSeconds: Double
     @State private var lastSavedSeconds: Double = 0
 
+    @State private var paragraphs: [String] = []
+    @State private var timeline: ParagraphTimeline?
+    @State private var currentParagraphIndex: Int?
+    @FocusState private var focusedParagraph: Int?
+    @State private var followSuspendedUntil = Date.distantPast
+    @State private var suppressFocusSuspension = false
+    @State private var controlsRevealed = false
+    @State private var paragraphFrames: [Int: CGRect] = [:]
+    @State private var scrollPositionID: Int?
+
+    /// Top padding of the read-along content.
+    private static let contentTopInset: CGFloat = 48
+
     init(book: Audiobook, textModel: BookTextModel, startSectionIndex: Int, startSeconds: Double) {
         self.book = book
         self.textModel = textModel
@@ -47,9 +60,17 @@ struct PlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.09, green: 0.09, blue: 0.11))
         .task(id: sectionIndex) {
+            updateParagraphs()
             await startAudio()
         }
+        .onReceive(textModel.$chapters) { _ in
+            updateParagraphs()
+        }
+        .onChange(of: audio.duration) {
+            rebuildTimeline()
+        }
         .onChange(of: audio.currentTime) { _, newTime in
+            currentParagraphIndex = timeline?.paragraphIndex(at: newTime)
             if abs(newTime - lastSavedSeconds) > 15 {
                 saveProgress(seconds: newTime)
             }
@@ -153,8 +174,8 @@ struct PlayerView: View {
                 }
             }
             Spacer()
-        } else if let chapter = textModel.chapter(forSectionIndex: sectionIndex) {
-            chapterScroll([chapter], header: nil)
+        } else if textModel.chapter(forSectionIndex: sectionIndex) != nil {
+            paragraphScroll
         } else if case .loaded = textModel.state {
             // Section didn't align — whole-book fallback.
             chapterScroll(textModel.chapters, header: "This chapter couldn't be matched — showing the full book text.")
@@ -177,6 +198,58 @@ struct PlayerView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+        }
+    }
+
+    private var paragraphScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
+                    // While playback runs the chapter dims as a whole and only
+                    // the narrated paragraph renders at full brightness.
+                    let dimmed = audio.isPlaying && index != currentParagraphIndex
+                    Text(paragraph)
+                        .font(.system(size: 38, design: .serif))
+                        .foregroundStyle(dimmed ? Color.secondary : Color.primary)
+                        .focusable()
+                        .focused($focusedParagraph, equals: index)
+                        .id(index)
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(
+                                key: ParagraphFramesKey.self,
+                                value: [index: geo.frame(in: .named("readAlongContent"))]
+                            )
+                        })
+                }
+            }
+            .coordinateSpace(name: "readAlongContent")
+            .onPreferenceChange(ParagraphFramesKey.self) { paragraphFrames = $0 }
+            .frame(maxWidth: 1200, alignment: .leading)
+            .padding(.horizontal, 64)
+            .padding(.top, Self.contentTopInset)
+            // Generous bottom inset so the last lines can scroll clear of the
+            // fold instead of being cut off.
+            .padding(.bottom, 160)
+        }
+        .scrollPosition(id: $scrollPositionID, anchor: .top)
+        .onChange(of: focusedParagraph) {
+            // Focus settling back into the text re-collapses controls that
+            // were revealed with an up-press.
+            if focusedParagraph != nil {
+                controlsRevealed = false
+            }
+            // A user-driven focus move between paragraphs is a manual scroll:
+            // pause following. Exempt are programmatic moves (play-start
+            // handoff) and focus dropping to nil, which auto-scroll causes by
+            // pushing the focused paragraph off-screen.
+            if suppressFocusSuspension {
+                suppressFocusSuspension = false
+            } else if audio.isPlaying, focusedParagraph != nil {
+                followSuspendedUntil = Date().addingTimeInterval(10)
+            }
+        }
+        .onChange(of: currentParagraphIndex) {
+            scrollToNarratedParagraph()
         }
     }
 
@@ -220,6 +293,10 @@ struct PlayerView: View {
                 pendingSeekSeconds = 0
             }
             saveProgress(seconds: audio.currentTime)
+            if !paragraphs.isEmpty {
+                suppressFocusSuspension = true
+                focusedParagraph = 0
+            }
         } catch is CancellationError {
             // View went away or section changed; nothing to do.
         } catch let error as URLError where error.code == .cancelled {
@@ -250,5 +327,45 @@ struct PlayerView: View {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
         let total = Int(seconds.rounded())
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    /// Re-derives paragraphs when the section or the loaded text changes,
+    /// resetting all sync state.
+    private func updateParagraphs() {
+        if let chapter = textModel.chapter(forSectionIndex: sectionIndex) {
+            paragraphs = ParagraphTimeline.paragraphs(from: chapter.body)
+        } else {
+            paragraphs = []
+        }
+        paragraphFrames = [:]
+        currentParagraphIndex = nil
+        followSuspendedUntil = .distantPast
+        rebuildTimeline()
+    }
+
+    private func rebuildTimeline() {
+        timeline = ParagraphTimeline(paragraphs: paragraphs, duration: audio.duration)
+        currentParagraphIndex = timeline?.paragraphIndex(at: audio.currentTime)
+    }
+
+    /// Scrolls the narrated paragraph to the top of the frame unless the
+    /// user recently moved focus manually.
+    private func scrollToNarratedParagraph() {
+        guard audio.isPlaying,
+              Date() >= followSuspendedUntil,
+              let index = currentParagraphIndex,
+              paragraphFrames[index] != nil else { return }
+        withAnimation(.easeInOut(duration: 0.6)) {
+            scrollPositionID = index
+        }
+    }
+}
+
+/// Collects each paragraph's frame (in read-along content coordinates) so
+/// the player can scroll the narrated paragraph to the top.
+private struct ParagraphFramesKey: PreferenceKey {
+    static var defaultValue: [Int: CGRect] { [:] }
+    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }
