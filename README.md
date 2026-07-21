@@ -1,63 +1,69 @@
-# BibleTV — ESV Bible for Apple TV
+# AudiobooksTV — Read-Along Audiobooks for Apple TV
 
-A SwiftUI Apple TV app that displays the Bible in the English Standard Version (ESV) and reads it aloud, chapter by chapter, using Crossway's official ESV audio (Hear the Word, read by David Cochran Heath).
+A SwiftUI Apple TV app that plays free public-domain audiobooks from
+[LibriVox](https://librivox.org) while showing the matching book text from
+[Project Gutenberg](https://www.gutenberg.org) on screen — listen and read
+along, chapter by chapter.
+
+Derived from [bible-appletv](https://github.com/jonyen/bible-appletv).
 
 ## Features
 
-- **Browse** all 66 books (Old and New Testament) and pick any chapter from a grid
-- **Read** the full chapter text on screen in a large serif face with subtle verse-number markers
-- **Listen** to the chapter's audio with play/pause and playback speed (0.75×–1.5×)
-- **Auto-advance**: when a chapter's audio finishes, the app moves to the next chapter and keeps reading — listen through a whole book hands-free
-- Recently played chapters are cached on-device so replays don't re-download
+- **Browse** curated genre shelves (Fiction, Mystery, Sci-Fi, Children's,
+  History, Adventure, Poetry) or search ~45,000 titles by title/author
+- **Read along**: chapter text on screen while the narration plays, with
+  play/pause, 0.75×–1.5× speed, and auto-advance to the next chapter
+- **Text-availability at a glance**: dimmed titles are audio-only; a
+  "Read-along only" toggle filters them out
+- **Continue Listening**: playback position is saved per book and resumable
+  from the home screen
+- Recently played chapters and book texts are cached on-device
+
+## How text matching works
+
+LibriVox book records link to their Project Gutenberg source text. The app
+downloads the plain text, strips the Gutenberg license boilerplate, splits it
+into chapters by heading detection, and aligns audio sections to text
+chapters by normalized title matching (Roman numerals → Arabic, punctuation
+stripped), with positional fallback. The detail screen reports how many
+chapters matched. Unmatched chapters fall back to a whole-book text scroll;
+books with no Gutenberg source play audio-only.
 
 ## Setup
 
-1. **Get a free ESV API key.** Create an account at [api.esv.org](https://api.esv.org/), register an application, and copy your API key.
-2. **Add the key to the app.** Open `BibleTV/Support/Secrets.swift` and paste your key:
+No API keys. Open `AudiobooksTV.xcodeproj` in Xcode 16 or later, select the
+*AudiobooksTV* scheme and an Apple TV simulator (or device), and run.
 
-   ```swift
-   enum Secrets {
-       static let esvAPIKey = "YOUR_KEY_HERE"
-   }
-   ```
-
-   To keep your key from being committed back to git:
-
-   ```sh
-   git update-index --skip-worktree BibleTV/Support/Secrets.swift
-   ```
-
-3. **Build and run.** Open `BibleTV.xcodeproj` in Xcode 16 or later, select the *BibleTV* scheme and an Apple TV simulator (or your Apple TV), and run.
-
-If you run the app without a key, it shows setup instructions instead of the library.
+Run the logic tests with `swift test` (macOS, no simulator needed).
 
 ## Project layout
 
 ```
-BibleTV/
-├── BibleTVApp.swift            App entry point
-├── Models/
-│   └── BibleBook.swift         The 66 books with chapter counts
+AudiobooksTV/
+├── AudiobooksTVApp.swift       App entry point
+├── Core/                       Pure logic — also built as an SPM target for tests
+│   ├── Audiobook.swift         Audiobook + AudioSection models
+│   ├── LibriVoxParser.swift    LibriVox JSON → models
+│   ├── GutenbergText.swift     Ebook ID extraction, boilerplate stripping
+│   ├── ChapterSplitter.swift   Plain text → chapters
+│   ├── SectionAligner.swift    Audio sections ↔ text chapters
+│   ├── RomanNumerals.swift     Roman numeral parsing
+│   ├── ProgressStore.swift     Saved playback positions
+│   └── Shelf.swift             Home-screen genre shelves
 ├── Services/
-│   ├── ESVClient.swift         ESV API client (passage text + audio download/cache)
-│   └── AudioPlayerModel.swift  AVPlayer wrapper (play/pause, rate, progress, finish events)
-├── Views/
-│   ├── BookListView.swift      OT/NT book list
-│   ├── ChapterGridView.swift   Chapter picker grid
-│   ├── ReaderView.swift        Chapter text + audio controls
-│   └── SetupView.swift         Shown when no API key is configured
-└── Support/
-    └── Secrets.swift           Your ESV API key (placeholder committed)
+│   ├── LibriVoxClient.swift    Catalog API + MP3 download/cache
+│   ├── GutenbergClient.swift   Text download/cache
+│   ├── BookTextModel.swift     Fetch → split → align orchestration
+│   └── AudioPlayerModel.swift  AVPlayer wrapper
+└── Views/
+    ├── HomeView.swift          Shelves + Continue Listening
+    ├── SearchView.swift        Title/author search
+    ├── BookDetailView.swift    Book info, chapters, match summary
+    ├── PlayerView.swift        Read-along player
+    ├── ShelfRowView.swift      Horizontal book row
+    └── BookCardView.swift      Cover card with text-availability tint
 ```
 
-## Licensing notes
+## Content licensing
 
-This app uses the [ESV API](https://api.esv.org/), which is free for **non-commercial** use. Key conditions (see the API terms for the authoritative text):
-
-- Display no more than 500 verses or half of a book at a time — a single chapter is always within this limit
-- Cache no more than 500 verses — the app keeps only a handful of recent audio chapters on disk
-- Display the ESV copyright attribution — shown in the reader's footer
-
-Distribution on the App Store or any commercial use requires permission from [Crossway](https://www.crossway.org/permissions/).
-
-Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.
+All audio (LibriVox) and text (Project Gutenberg) is in the public domain.
