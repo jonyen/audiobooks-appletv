@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @AppStorage("readAlongOnly") private var readAlongOnly = false
     @ObservedObject private var progressStore = ProgressStore.shared
+    @State private var showAccount = false
 
     var body: some View {
         ScrollView {
@@ -42,7 +43,15 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "magnifyingglass")
                 }
+                Button {
+                    showAccount = true
+                } label: {
+                    Image(systemName: "person.crop.circle")
+                }
             }
+        }
+        .sheet(isPresented: $showAccount) {
+            AccountView()
         }
     }
 
