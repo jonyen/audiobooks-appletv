@@ -21,6 +21,9 @@ final class AccountModel: ObservableObject {
     @Published var errorMessage: String?
 
     private var pollTask: Task<Void, Never>?
+    /// Bumped on each new sign-in attempt and on cancellation so a dying
+    /// task's completion handler can detect it's stale and skip cleanup.
+    private var flowGeneration = 0
 
     /// True when both GoogleService-Info.plist and GoogleTVClient.plist
     /// are present. Missing either → account UI shows "not configured".
@@ -46,18 +49,24 @@ final class AccountModel: ObservableObject {
     func signIn() {
         guard pollTask == nil, let client = Self.tvClient else { return }
         errorMessage = nil
+        flowGeneration += 1
+        let generation = flowGeneration
         pollTask = Task { [weak self] in
-            await self?.runDeviceFlow(client: client)
-            self?.pollTask = nil
-            self?.pairing = nil
+            await self?.runDeviceFlow(client: client, generation: generation)
+            if let self, self.flowGeneration == generation {
+                self.pollTask = nil
+                self.pairing = nil
+            }
         }
     }
 
     /// Stops an in-progress pairing (sheet dismissed or Cancel pressed).
     func cancelSignIn() {
+        flowGeneration += 1
         pollTask?.cancel()
         pollTask = nil
         pairing = nil
+        errorMessage = nil
     }
 
     func signOut() {
@@ -66,15 +75,25 @@ final class AccountModel: ObservableObject {
 
     // MARK: Device flow
 
-    private func runDeviceFlow(client: (id: String, secret: String)) async {
+    private func runDeviceFlow(client: (id: String, secret: String), generation: Int) async {
         do {
             let code = try await Self.requestDeviceCode(clientID: client.id)
+            guard flowGeneration == generation else { return }
             pairing = Pairing(userCode: code.userCode, verificationURL: code.verificationURL)
             var interval = Double(code.interval ?? 5)
             let deadline = Date().addingTimeInterval(Double(code.expiresIn))
             while Date() < deadline {
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                let body = try await Self.pollToken(client: client, deviceCode: code.deviceCode)
+                guard flowGeneration == generation else { return }
+                let body: Data
+                do {
+                    body = try await Self.pollToken(client: client, deviceCode: code.deviceCode)
+                } catch let error as URLError where error.code != .cancelled {
+                    // Transient transport failure: skip this round, keep the
+                    // pairing alive — the expires_in deadline still bounds us.
+                    continue
+                }
+                guard flowGeneration == generation else { return }
                 switch GoogleDeviceAuth.pollOutcome(body: body, interval: interval) {
                 case .authorized(let token):
                     let credential = GoogleAuthProvider.credential(
@@ -88,12 +107,14 @@ final class AccountModel: ObservableObject {
                     return
                 }
             }
+            guard flowGeneration == generation else { return }
             errorMessage = "The code expired. Try again."
         } catch is CancellationError {
             // User dismissed the pairing; nothing to report.
         } catch let error as URLError where error.code == .cancelled {
             // Same: cancellation landed mid-request instead of mid-sleep.
         } catch {
+            guard flowGeneration == generation else { return }
             errorMessage = error.localizedDescription
         }
     }
