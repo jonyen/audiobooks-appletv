@@ -9,8 +9,15 @@ Port the AudiobooksTV Apple TV app to a web app with feature parity (browse
 genre shelves, search, read-along player with paragraph-synced text follow,
 speed control, auto-advance, preamble auto-skip, Continue Listening), and sync
 listening progress two-way between the tvOS app and the web app. Users sign in
-with their Apple account. All backend services run on free tiers. This mirrors
+with their Google account. All backend services run on free tiers. This mirrors
 the bible-appletv web port's architecture.
+
+> **2026-07-24 amendment:** the original design used Sign in with Apple, which
+> requires the paid Apple Developer Program ($99/yr) for the entitlement, the
+> Services ID, and the signing key. To keep the project free, auth switched to
+> Google: a normal popup on web and the OAuth device flow (QR + short code,
+> the "YouTube on TV" pattern) on tvOS. Both land on the same Google identity
+> and therefore the same Firebase `uid`; the sync design is unchanged.
 
 ## Architecture
 
@@ -33,19 +40,29 @@ Three pieces:
      shapes) and aggressive edge caching via the Cache API (public-domain,
      effectively immutable content; long TTLs) to keep load off LibriVox and
      Gutenberg and make abuse pointless.
-3. **Firebase (own project, Spark free tier)** — Auth with the **Apple**
+3. **Firebase (own project, Spark free tier)** — Auth with the **Google**
    provider for sign-in, Firestore for synced state. Separate from the
-   bible-appletv Firebase project: own data, rules, and quotas. Requires the
-   same one-time Apple Developer portal setup (Services ID, web domain
-   verification, Sign in with Apple key configured in the Firebase console).
+   bible-appletv Firebase project: own data, rules, and quotas. One-time
+   setup: enable the Google provider in the Firebase console, and create a
+   "TVs and Limited Input Devices" OAuth client in the project's Google
+   Cloud console for the tvOS device flow.
 
 ## Authentication
 
-- **Web:** Firebase Auth `OAuthProvider("apple.com")` popup/redirect flow.
-  Sign-in is **required** on the web app (its purpose is synced listening).
-- **tvOS:** native Sign in with Apple via `AuthenticationServices`, identity
-  token exchanged for a Firebase credential. Sign-in is **optional**: signed
-  out, the app behaves exactly as today with local `UserDefaults` state.
+- **Web:** Firebase Auth `GoogleAuthProvider` popup flow. Sign-in is
+  **required** on the web app (its purpose is synced listening).
+- **tvOS:** Google **OAuth device flow** (RFC 8628, Google's
+  "TVs and Limited Input Devices" client type). The account screen requests
+  a device code, shows the short user code plus a QR of the verification
+  URL, and polls Google's token endpoint (honoring `authorization_pending`
+  and `slow_down`). On approval, the returned Google ID token is exchanged
+  for a Firebase credential via `GoogleAuthProvider.credential` — the same
+  Google identity and Firebase `uid` as the web app. The TV client ID and
+  secret load from a gitignored `GoogleTVClient.plist` (Google treats
+  limited-input client secrets as non-confidential, but the repo is public,
+  so they stay out of git); absent that file, sign-in is unavailable and
+  the app runs local-only. Sign-in remains **optional**: signed out, the
+  app behaves exactly as today with local `UserDefaults` state.
 
 ## Data model & sync
 
@@ -112,7 +129,7 @@ web/
 │   │   ├── progress.ts          // Firestore-backed store + merge rules
 │   │   └── firebase.ts          // app init, auth helpers
 │   ├── components/
-│   │   ├── SignIn.tsx           // Apple sign-in screen
+│   │   ├── SignIn.tsx           // Google sign-in screen
 │   │   ├── Home.tsx             // genre shelves + Continue Listening
 │   │   ├── Search.tsx           // title/author search, read-along filter
 │   │   ├── BookDetail.tsx       // info, section list (gold = finished),
@@ -149,8 +166,9 @@ Mirrors tvOS:
 Kept minimal:
 
 - Add Firebase Auth + Firestore SDKs via Swift Package Manager.
-- A small account view (library header or settings): Sign in with Apple
-  button, signed-in state, sign out.
+- A small account view (library header or settings): Sign in with Google
+  button (device flow: QR + short code + polling), signed-in state,
+  sign out.
 - `ProgressStore` and `PreambleOffsetStore` gain cloud mirrors behind their
   existing public APIs: writes always go to `UserDefaults`, additionally to
   Firestore when signed in; snapshot listeners apply remote changes using
@@ -183,7 +201,7 @@ Kept minimal:
 ## Out of scope
 
 - Offline listening on the web beyond Firestore's write queue
-- Any account system other than Apple
+- Any account system other than Google
 - On-device MP3 caching in the browser (the tvOS app's download cache has
   no web equivalent here; streaming only)
 - Restructuring the tvOS app beyond the store mirrors and sign-in
