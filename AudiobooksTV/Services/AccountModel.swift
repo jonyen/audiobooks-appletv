@@ -91,6 +91,8 @@ final class AccountModel: ObservableObject {
             errorMessage = "The code expired. Try again."
         } catch is CancellationError {
             // User dismissed the pairing; nothing to report.
+        } catch let error as URLError where error.code == .cancelled {
+            // Same: cancellation landed mid-request instead of mid-sleep.
         } catch {
             errorMessage = error.localizedDescription
         }
