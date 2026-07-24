@@ -15,3 +15,4 @@ build/
 .swiftpm/
 .superpowers/
 AudiobooksTV/GoogleService-Info.plist
+AudiobooksTV/GoogleTVClient.plist

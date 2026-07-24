@@ -2,9 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.applesignin</key>
-	<array>
-		<string>Default</string>
-	</array>
+	<key>CLIENT_ID</key>
+	<string>1234567890-example.apps.googleusercontent.com</string>
+	<key>CLIENT_SECRET</key>
+	<string>example-not-a-real-secret</string>
 </dict>
 </plist>

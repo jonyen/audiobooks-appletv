@@ -1,6 +1,8 @@
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 
-/// Sign in with Apple to sync listening progress with the web app.
+/// Sign in with Google (device flow) to sync listening progress with the
+/// web app: shows a short code + QR, approved on the user's phone.
 struct AccountView: View {
     @ObservedObject private var account = AccountModel.shared
     @Environment(\.dismiss) private var dismiss
@@ -20,11 +22,25 @@ struct AccountView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("Sign Out") { account.signOut() }
+            } else if let pairing = account.pairing {
+                Text("On your phone, scan the code or visit \(pairing.verificationURL), then enter:")
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 900)
+                Text(pairing.userCode)
+                    .font(.system(size: 48, weight: .bold, design: .monospaced))
+                if let qr = Self.qrImage(for: pairing.verificationURL) {
+                    Image(uiImage: qr)
+                        .interpolation(.none)
+                        .resizable()
+                        .frame(width: 240, height: 240)
+                }
+                ProgressView()
+                Button("Cancel") { account.cancelSignIn() }
             } else {
-                Text("Sign in to sync your listening progress with the web app.")
+                Text("Sign in with Google to sync your listening progress with the web app.")
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 800)
-                Button(" Sign in with Apple") { account.signIn() }
+                Button("Sign in with Google") { account.signIn() }
             }
 
             if let error = account.errorMessage {
@@ -35,5 +51,15 @@ struct AccountView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(64)
+        .onDisappear { account.cancelSignIn() }
+    }
+
+    private static func qrImage(for string: String) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(string.utf8)
+        guard let output = filter.outputImage else { return nil }
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+        guard let cgImage = CIContext().createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
