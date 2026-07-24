@@ -3,6 +3,7 @@ import CryptoKit
 import FirebaseAuth
 import FirebaseCore
 import SwiftUI
+import UIKit
 
 /// Firebase-backed account state. Sign-in is optional: everything degrades
 /// to local-only behavior when Firebase isn't configured or no one signed in.
@@ -34,6 +35,7 @@ final class AccountModel: NSObject, ObservableObject {
         request.nonce = Self.sha256(nonce)
         let controller = ASAuthorizationController(authorizationRequests: [request])
         controller.delegate = self
+        controller.presentationContextProvider = self
         controller.performRequests()
     }
 
@@ -85,6 +87,17 @@ extension AccountModel: ASAuthorizationControllerDelegate {
             if (error as? ASAuthorizationError)?.code != .canceled {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+}
+
+extension AccountModel: ASAuthorizationControllerPresentationContextProviding {
+    // Documented to be called on the main thread.
+    nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        MainActor.assumeIsolated {
+            UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+                .first ?? ASPresentationAnchor()
         }
     }
 }
