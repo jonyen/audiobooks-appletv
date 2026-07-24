@@ -164,4 +164,15 @@ final class CloudProgressTests: XCTestCase {
         cloud.unhiddenMarks["7"] = 200
         XCTAssertEqual(CloudProgress.fromDictionary(cloud.asDictionary), cloud)
     }
+
+    func testMergePayloadDropsEmptyMaps() {
+        var cloud = CloudProgress.empty
+        cloud.hiddenMarks["52"] = 100
+        let payload = cloud.asMergePayload
+        XCTAssertNotNil(payload["hiddenMarks"])
+        XCTAssertNil(payload["unhiddenMarks"])
+        XCTAssertNil(payload["finishedMarks"])
+        XCTAssertNil(payload["positions"])
+        XCTAssertTrue(CloudProgress.empty.asMergePayload.isEmpty)
+    }
 }

@@ -68,6 +68,7 @@ export default function BookDetail({ progress }: { progress: Progress }) {
             </Link>
           )}
           <button
+            type="button"
             className="hide-toggle"
             onClick={() => progress.toggleHidden(book.id)}
           >

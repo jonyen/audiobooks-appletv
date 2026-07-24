@@ -73,7 +73,7 @@ function ShelfRow({
           {books
             .filter((book) => !progress.isHidden(book.id))
             .map((book) => (
-              <BookCard key={book.id} book={book} />
+              <BookCard key={book.id} book={book} onToggleHidden={progress.toggleHidden} />
             ))}
         </div>
       )}

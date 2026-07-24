@@ -12,8 +12,9 @@ struct CloudPosition: Codable, Equatable {
 
 /// Cloud form of listening progress. Positions are last-writer-wins per
 /// book; finished sections are a mark/tombstone set (finished iff the
-/// finished mark is newer than any unfinished mark). Merging never deletes
-/// marks, so device states always converge.
+/// finished mark is newer than any unfinished mark). Hidden books use the
+/// same mark/tombstone rule, keyed by book ID instead of section. Merging
+/// never deletes marks, so device states always converge.
 struct CloudProgress: Equatable {
     var positions: [String: CloudPosition]
     var finishedMarks: [String: Double]
@@ -205,5 +206,16 @@ struct CloudProgress: Equatable {
             "hiddenMarks": hiddenMarks,
             "unhiddenMarks": unhiddenMarks,
         ]
+    }
+
+    /// Payload for a `merge: true` write, with empty top-level maps
+    /// dropped. Firestore adds an empty map to the update mask and replaces
+    /// the server's value, so uploading `hiddenMarks: [:]` from a device
+    /// that has hidden nothing would erase every hide made elsewhere.
+    var asMergePayload: [String: Any] {
+        asDictionary.filter { _, value in
+            if let map = value as? [String: Any] { return !map.isEmpty }
+            return true
+        }
     }
 }

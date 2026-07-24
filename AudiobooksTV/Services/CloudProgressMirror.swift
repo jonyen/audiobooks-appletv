@@ -90,7 +90,7 @@ final class CloudProgressMirror {
         let localCloud = CloudProgress.fromLocal(
             items: store.items, finished: store.finished, hidden: store.hidden
         )
-        progressDoc?.setData(localCloud.asDictionary, merge: true)
+        progressDoc?.setData(localCloud.asMergePayload, merge: true)
 
         let localOffsets = preambles.allOffsets
         if !localOffsets.isEmpty {
@@ -124,8 +124,9 @@ final class CloudProgressMirror {
     }
 
     /// Writes one mark-map entry and mirrors it into `lastKnown`. The key
-    /// path and the Firestore field name travel together, so the local
-    /// mirror can't drift from what gets written remotely.
+    /// path and the Firestore field name are passed together by each call
+    /// site, so a mismatch between the local mirror and the remote write is
+    /// visible in a single line rather than split across a branch.
     private func writeMark(
         _ field: WritableKeyPath<CloudProgress, [String: Double]>,
         named name: String,

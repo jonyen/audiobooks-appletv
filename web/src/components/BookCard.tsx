@@ -33,10 +33,8 @@ export default function BookCard({
           type="button"
           className="card-hide"
           title={hidden ? "Unhide this book" : "Hide this book"}
-          onClick={(event) => {
-            event.preventDefault();
-            onToggleHidden(book.id);
-          }}
+          aria-label={hidden ? "Unhide this book" : "Hide this book"}
+          onClick={() => onToggleHidden(book.id)}
         >
           {hidden ? "↺" : "✕"}
         </button>

@@ -36,6 +36,21 @@ unhide survives merges.
 Writes are field-level `setDoc`/`setData` merges on a single top-level field,
 so concurrent devices never clobber each other's maps.
 
+### Known limitation
+
+The first-sign-in union upload (tvOS `CloudProgressMirror.attach()`, web's
+equivalent) fixes the empty-map-erases-cloud-data bug by dropping empty
+top-level maps from the merge write, but it does not fix a smaller residual
+issue: local hidden state has no per-book timestamps, so that upload
+re-stamps every locally hidden book's `hiddenMarks` entry at `now`. If a book
+was unhidden remotely (from another device) while this device was signed
+out, its local `hiddenMarks` entry is still present and stale, and the
+re-stamped upload can beat the remote `unhiddenMarks` entry, silently
+re-hiding the book everywhere. The complete fix is to defer the union upload
+until the first snapshot has merged into `lastKnown`, and then upload only
+the keys the cloud doc doesn't already carry. The same limitation already
+applies to finished-section marks, for the same reason.
+
 ## Behavior
 
 - **Home shelves** hide the books, filtered client-side after the LibriVox
