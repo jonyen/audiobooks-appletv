@@ -79,3 +79,19 @@ a { color: inherit; text-decoration: none; }
 
 .sections { display: flex; flex-direction: column; gap: 0.4rem; padding-left: 1.5rem; }
 .sections a.finished { color: var(--gold); }
+
+.player { max-width: 900px; margin: 0 auto; padding: 1rem 1.5rem 8rem; }
+.controls { position: sticky; top: 0; background: var(--bg); padding: 0.75rem 0; z-index: 1; border-bottom: 1px solid var(--panel); }
+.controls-row { display: flex; gap: 0.5rem; align-items: center; }
+.controls-title { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.controls-progress { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+.controls-progress progress { flex: 1; }
+.controls button.inactive { opacity: 0.4; }
+.controls button.gold { color: var(--gold); border-color: var(--gold); }
+
+.reader { font-size: 1.35rem; line-height: 1.8; margin-top: 1.5rem; }
+.para { white-space: pre-line; scroll-margin-top: 7rem; transition: color 0.3s; }
+.para.dimmed { color: var(--dim); }
+
+.cover-only { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-top: 3rem; }
+.cover-only img { max-width: 320px; border-radius: 12px; }
