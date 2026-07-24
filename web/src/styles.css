@@ -1,0 +1,42 @@
+:root {
+  color-scheme: dark;
+  --bg: #17171c;
+  --panel: #1f1f26;
+  --fg: #e8e4d8;
+  --dim: #8a8578;
+  --gold: #c9a227;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.6;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { border-color: var(--fg); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+input {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+}
+
+a { color: inherit; text-decoration: none; }
