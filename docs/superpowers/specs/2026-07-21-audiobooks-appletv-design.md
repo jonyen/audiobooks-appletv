@@ -1,7 +1,13 @@
 # AudiobooksTV — Read-Along Audiobooks for Apple TV
 
 **Date:** 2026-07-21
-**Status:** Approved
+**Status:** Approved — superseded in part
+
+> **Note (2026-07-24):** two items listed under "Out of scope (v1)" below —
+> user accounts and sync across devices — have since shipped. See
+> `2026-07-23-web-port-synced-progress-design.md` for the current auth and
+> sync design, including its 2026-07-24 amendment swapping Apple sign-in
+> for Google.
 
 ## Premise
 
