@@ -64,6 +64,14 @@ struct BookDetailView: View {
                     }
                     .disabled(book.sections.isEmpty)
 
+                    Button {
+                        progressStore.toggleHidden(bookID: book.id)
+                    } label: {
+                        let hidden = progressStore.isHidden(bookID: book.id)
+                        Label(hidden ? "Unhide from Shelves" : "Hide from Shelves",
+                              systemImage: hidden ? "eye" : "eye.slash")
+                    }
+
                     if !book.description.isEmpty {
                         Text(book.description)
                             .font(.body)

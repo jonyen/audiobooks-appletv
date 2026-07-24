@@ -6,9 +6,12 @@ struct ShelfRowView: View {
 
     @State private var books: [Audiobook] = []
     @State private var failed = false
+    @ObservedObject private var progressStore = ProgressStore.shared
 
     private var visibleBooks: [Audiobook] {
-        readAlongOnly ? books.filter(\.hasText) : books
+        books.filter { book in
+            !progressStore.isHidden(bookID: book.id) && (!readAlongOnly || book.hasText)
+        }
     }
 
     var body: some View {
@@ -33,6 +36,13 @@ struct ShelfRowView: View {
                             BookCardView(book: book)
                         }
                         .buttonStyle(.card)
+                        .contextMenu {
+                            Button {
+                                progressStore.toggleHidden(bookID: book.id)
+                            } label: {
+                                Label("Hide", systemImage: "eye.slash")
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 64)

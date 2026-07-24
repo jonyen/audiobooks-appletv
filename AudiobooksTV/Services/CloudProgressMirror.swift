@@ -59,17 +59,37 @@ final class CloudProgressMirror {
             )
         }
         store.onFinishedMarked = { [weak self] bookID, sectionIndex in
-            self?.writeMark(field: "finishedMarks", bookID: bookID, sectionIndex: sectionIndex)
+            self?.writeMark(
+                \.finishedMarks, named: "finishedMarks",
+                key: CloudProgress.sectionKey(bookID: bookID, sectionIndex: sectionIndex)
+            )
         }
         store.onFinishedUnmarked = { [weak self] bookID, sectionIndex in
-            self?.writeMark(field: "unfinishedMarks", bookID: bookID, sectionIndex: sectionIndex)
+            self?.writeMark(
+                \.unfinishedMarks, named: "unfinishedMarks",
+                key: CloudProgress.sectionKey(bookID: bookID, sectionIndex: sectionIndex)
+            )
+        }
+        store.onHiddenMarked = { [weak self] bookID in
+            self?.writeMark(
+                \.hiddenMarks, named: "hiddenMarks",
+                key: CloudProgress.bookKey(bookID: bookID)
+            )
+        }
+        store.onHiddenUnmarked = { [weak self] bookID in
+            self?.writeMark(
+                \.unhiddenMarks, named: "unhiddenMarks",
+                key: CloudProgress.bookKey(bookID: bookID)
+            )
         }
         preambles.onSaved = { [weak self] sectionID, offset in
             self?.preambleDoc?.setData(["offsets": [sectionID: offset]], merge: true)
         }
 
         // First attach: union local state into the cloud doc, then listen.
-        let localCloud = CloudProgress.fromLocal(items: store.items, finished: store.finished)
+        let localCloud = CloudProgress.fromLocal(
+            items: store.items, finished: store.finished, hidden: store.hidden
+        )
         progressDoc?.setData(localCloud.asDictionary, merge: true)
 
         let localOffsets = preambles.allOffsets
@@ -86,7 +106,9 @@ final class CloudProgressMirror {
                 guard merged != self.lastKnown else { return }
                 self.lastKnown = merged
                 ProgressStore.shared.applyRemote(
-                    items: merged.localItems, finished: merged.localFinished
+                    items: merged.localItems,
+                    finished: merged.localFinished,
+                    hidden: merged.localHidden
                 )
             }
         }
@@ -101,12 +123,17 @@ final class CloudProgressMirror {
         lastKnown = CloudProgress.merge(lastKnown, localCloud)
     }
 
-    private func writeMark(field: String, bookID: Int, sectionIndex: Int) {
-        let key = CloudProgress.sectionKey(bookID: bookID, sectionIndex: sectionIndex)
+    /// Writes one mark-map entry and mirrors it into `lastKnown`. The key
+    /// path and the Firestore field name travel together, so the local
+    /// mirror can't drift from what gets written remotely.
+    private func writeMark(
+        _ field: WritableKeyPath<CloudProgress, [String: Double]>,
+        named name: String,
+        key: String
+    ) {
         let now = Date().timeIntervalSince1970 * 1000
-        if field == "finishedMarks" { lastKnown.finishedMarks[key] = now }
-        else { lastKnown.unfinishedMarks[key] = now }
-        progressDoc?.setData([field: [key: now]], merge: true)
+        lastKnown[keyPath: field][key] = now
+        progressDoc?.setData([name: [key: now]], merge: true)
     }
 
     private func detach() {
@@ -118,6 +145,8 @@ final class CloudProgressMirror {
         ProgressStore.shared.onPositionSaved = nil
         ProgressStore.shared.onFinishedMarked = nil
         ProgressStore.shared.onFinishedUnmarked = nil
+        ProgressStore.shared.onHiddenMarked = nil
+        ProgressStore.shared.onHiddenUnmarked = nil
         PreambleOffsetStore.shared.onSaved = nil
     }
 }

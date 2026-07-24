@@ -7,6 +7,7 @@ struct SearchView: View {
     @State private var results: [Audiobook] = []
     @State private var isSearching = false
     @State private var errorMessage: String?
+    @ObservedObject private var progressStore = ProgressStore.shared
 
     private let columns = [GridItem(.adaptive(minimum: 300), spacing: 32)]
 
@@ -42,9 +43,18 @@ struct SearchView: View {
                 LazyVGrid(columns: columns, spacing: 48) {
                     ForEach(visibleResults) { book in
                         NavigationLink(value: book) {
-                            BookCardView(book: book)
+                            BookCardView(book: book, isHidden: progressStore.isHidden(bookID: book.id))
                         }
                         .buttonStyle(.card)
+                        .contextMenu {
+                            Button {
+                                progressStore.toggleHidden(bookID: book.id)
+                            } label: {
+                                let hidden = progressStore.isHidden(bookID: book.id)
+                                Label(hidden ? "Unhide" : "Hide",
+                                      systemImage: hidden ? "eye" : "eye.slash")
+                            }
+                        }
                     }
                 }
                 .padding(64)
