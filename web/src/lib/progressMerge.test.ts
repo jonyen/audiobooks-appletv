@@ -79,3 +79,12 @@ test("offsets merge as a union with existing values preserved", () => {
     "52.4": 0,
   });
 });
+
+test("position merge is commutative on an exact updatedAt tie", () => {
+  const a = state({ positions: { "1": pos(1, 100, 42) } });
+  const b = state({ positions: { "1": { ...pos(1, 100, 99) } } });
+  const ab = mergeProgress(a, b).positions["1"];
+  const ba = mergeProgress(b, a).positions["1"];
+  expect(ab).toEqual(ba);
+  expect(ab.seconds).toBe(99); // deterministic winner: greater seconds on tie
+});

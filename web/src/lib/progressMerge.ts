@@ -50,12 +50,23 @@ function maxByKey(a: Record<string, number>, b: Record<string, number>): Record<
   return merged;
 }
 
+/**
+ * The newer of two positions by updatedAt. Exact-tie comparisons fall back
+ * to content fields so the choice is deterministic and merge order never
+ * matters (mergeProgress(a, b) === mergeProgress(b, a)).
+ */
+function newerPosition(x: PlaybackPosition, y: PlaybackPosition): PlaybackPosition {
+  if (x.updatedAt !== y.updatedAt) return x.updatedAt > y.updatedAt ? x : y;
+  if (x.seconds !== y.seconds) return x.seconds > y.seconds ? x : y;
+  if (x.sectionIndex !== y.sectionIndex) return x.sectionIndex > y.sectionIndex ? x : y;
+  if (x.bookTitle !== y.bookTitle) return x.bookTitle > y.bookTitle ? x : y;
+  return (x.coverURL ?? "") >= (y.coverURL ?? "") ? x : y;
+}
+
 export function mergeProgress(a: ProgressState, b: ProgressState): ProgressState {
   const positions = { ...a.positions };
   for (const [key, position] of Object.entries(b.positions)) {
-    if (positions[key] === undefined || position.updatedAt > positions[key].updatedAt) {
-      positions[key] = position;
-    }
+    positions[key] = positions[key] === undefined ? position : newerPosition(positions[key], position);
   }
   return {
     positions,
