@@ -25,3 +25,15 @@ export function parseEbookID(raw: string | undefined): number | null {
   if (!raw || !/^[1-9]\d*$/.test(raw)) return null;
   return parseInt(raw, 10);
 }
+
+/** Tries candidates in order with the given fetcher; returns the first ok Response or null. */
+export async function firstOkResponse(
+  candidates: string[],
+  fetcher: (url: string) => Promise<Response>
+): Promise<Response | null> {
+  for (const candidate of candidates) {
+    const response = await fetcher(candidate);
+    if (response.ok) return response;
+  }
+  return null;
+}

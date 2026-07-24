@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { gutenbergCandidates, librivoxUpstreamURL, parseEbookID } from "./upstream";
+import { firstOkResponse, gutenbergCandidates, librivoxUpstreamURL, parseEbookID } from "./upstream";
 
 test("librivox URL keeps only allowlisted params and appends format", () => {
   const url = librivoxUpstreamURL(
@@ -29,4 +29,24 @@ test("parseEbookID accepts only positive integers", () => {
   expect(parseEbookID("12a")).toBeNull();
   expect(parseEbookID("../etc")).toBeNull();
   expect(parseEbookID(undefined)).toBeNull();
+});
+
+test("firstOkResponse returns the first ok response, skipping earlier failures", async () => {
+  const requested: string[] = [];
+  const fetcher = async (url: string) => {
+    requested.push(url);
+    if (url === "a") return new Response("nope", { status: 404 });
+    if (url === "b") return new Response("hi", { status: 200 });
+    throw new Error("should not reach c");
+  };
+  const response = await firstOkResponse(["a", "b", "c"], fetcher);
+  expect(response).not.toBeNull();
+  expect(await response!.text()).toBe("hi");
+  expect(requested).toEqual(["a", "b"]);
+});
+
+test("firstOkResponse returns null when every candidate fails", async () => {
+  const fetcher = async () => new Response("nope", { status: 404 });
+  const response = await firstOkResponse(["a", "b"], fetcher);
+  expect(response).toBeNull();
 });

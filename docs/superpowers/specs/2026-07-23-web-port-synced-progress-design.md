@@ -164,7 +164,8 @@ Kept minimal:
   display (as tvOS does); preamble analysis failure means no skip —
   estimates run without `leadIn`; Firestore errors never block local writes.
 - **Proxy:** upstream errors pass through with status; requests outside the
-  allowlist get 404; cache errors fall through to a live fetch.
+  allowlist get 404; malformed ebook IDs get 400; cache errors fall through
+  to a live fetch.
 - **tvOS:** Firestore errors never block `UserDefaults` writes; retries are
   left to Firestore's SDK.
 
@@ -173,7 +174,9 @@ Kept minimal:
 - **Web:** Vitest unit tests for every `lib/` port, reusing the Swift test
   fixtures verbatim so both implementations stay in agreement; merge-rule
   tests (LWW positions, mark/tombstone finished sections, preamble union).
-- **Proxy:** allowlist and passthrough tests via `wrangler dev`/Miniflare.
+- **Proxy:** allowlist and candidate-fallthrough logic unit-tested via
+  dependency injection (Vitest); end-to-end passthrough smoked via
+  `wrangler pages dev` + curl.
 - **tvOS:** extend the Swift tests with the same merge-rule cases (union,
   unmark tombstones, first-sign-in upload).
 
