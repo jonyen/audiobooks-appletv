@@ -21,7 +21,7 @@ function SignedInApp({ uid }: { uid: string }) {
     <HashRouter>
       <Routes>
         <Route path="/" element={<Home progress={progress} />} />
-        <Route path="/search" element={<Search />} />
+        <Route path="/search" element={<Search progress={progress} />} />
         <Route path="/book/:id" element={<BookDetail progress={progress} />} />
         <Route
           path="/book/:id/play/:section"

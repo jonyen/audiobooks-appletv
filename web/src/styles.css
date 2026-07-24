@@ -95,3 +95,24 @@ a { color: inherit; text-decoration: none; }
 
 .cover-only { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-top: 3rem; }
 .cover-only img { max-width: 320px; border-radius: 12px; }
+
+.card-wrap { position: relative; width: 150px; flex-shrink: 0; }
+.shelf-grid .card-wrap { width: auto; }
+.card-hidden .card img, .card-hidden .card-placeholder { opacity: 0.35; }
+
+.card-hide {
+  position: absolute; top: 0.35rem; right: 0.35rem;
+  padding: 0.05rem 0.45rem; border-radius: 999px;
+  background: rgba(23, 23, 28, 0.85);
+  opacity: 0; transition: opacity 0.15s;
+}
+.card-wrap:hover .card-hide, .card-hide:focus { opacity: 1; }
+
+.card-badge {
+  position: absolute; top: 0.35rem; left: 0.35rem;
+  font-size: 0.6rem; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--dim); background: rgba(23, 23, 28, 0.85);
+  border-radius: 4px; padding: 0.1rem 0.35rem;
+}
+
+.hide-toggle { display: block; margin-top: 0.5rem; font-size: 0.85rem; }

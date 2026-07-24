@@ -2,9 +2,11 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { db } from "./firebase";
 import {
+  bookKey,
   continueListening,
   emptyProgress,
   isFinished as stateIsFinished,
+  isHidden as stateIsHidden,
   mergeOffsets,
   mergeProgress,
   positionsFromSnapshot,
@@ -21,6 +23,9 @@ export interface Progress {
   isFinished(bookID: number, sectionIndex: number): boolean;
   markFinished(bookID: number, sectionIndex: number): void;
   toggleFinished(bookID: number, sectionIndex: number): void;
+  /** Hidden books drop out of Home shelves; search still shows them. */
+  isHidden(bookID: number): boolean;
+  toggleHidden(bookID: number): void;
 }
 
 /**
@@ -49,7 +54,10 @@ export function useProgress(uid: string): Progress {
   }, [ref]);
 
   const writeMark = useCallback(
-    (field: "finishedMarks" | "unfinishedMarks", key: string) => {
+    (
+      field: "finishedMarks" | "unfinishedMarks" | "hiddenMarks" | "unhiddenMarks",
+      key: string
+    ) => {
       const now = Date.now();
       setState((s) => ({ ...s, [field]: { ...s[field], [key]: now } }));
       void setDoc(ref, { [field]: { [key]: now } }, { merge: true });
@@ -78,6 +86,11 @@ export function useProgress(uid: string): Progress {
           finished ? "unfinishedMarks" : "finishedMarks",
           sectionKey(bookID, sectionIndex)
         );
+      },
+      isHidden: (bookID) => stateIsHidden(state, bookID),
+      toggleHidden: (bookID) => {
+        const hidden = stateIsHidden(state, bookID);
+        writeMark(hidden ? "unhiddenMarks" : "hiddenMarks", bookKey(bookID));
       },
     }),
     [state, ref, writeMark]

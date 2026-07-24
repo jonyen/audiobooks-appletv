@@ -67,6 +67,12 @@ export default function BookDetail({ progress }: { progress: Progress }) {
               ▶ Continue — Section {saved.sectionIndex + 1}
             </Link>
           )}
+          <button
+            className="hide-toggle"
+            onClick={() => progress.toggleHidden(book.id)}
+          >
+            {progress.isHidden(book.id) ? "Unhide from shelves" : "Hide from shelves"}
+          </button>
         </div>
       </div>
 

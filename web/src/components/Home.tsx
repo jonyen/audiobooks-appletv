@@ -37,13 +37,21 @@ export default function Home({ progress }: { progress: Progress }) {
       )}
 
       {SHELVES.map((shelf) => (
-        <ShelfRow key={shelf.id} genre={shelf.id} title={shelf.title} />
+        <ShelfRow key={shelf.id} genre={shelf.id} title={shelf.title} progress={progress} />
       ))}
     </main>
   );
 }
 
-function ShelfRow({ genre, title }: { genre: string; title: string }) {
+function ShelfRow({
+  genre,
+  title,
+  progress,
+}: {
+  genre: string;
+  title: string;
+  progress: Progress;
+}) {
   const [books, setBooks] = useState<Audiobook[] | "error" | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +70,11 @@ function ShelfRow({ genre, title }: { genre: string; title: string }) {
       {books === "error" && <p className="dim">Couldn't load this shelf.</p>}
       {Array.isArray(books) && (
         <div className="shelf-row">
-          {books.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
+          {books
+            .filter((book) => !progress.isHidden(book.id))
+            .map((book) => (
+              <BookCard key={book.id} book={book} />
+            ))}
         </div>
       )}
     </section>

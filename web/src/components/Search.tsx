@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import type { Audiobook } from "../lib/librivox";
 import { hasText } from "../lib/gutenberg";
 import { searchBooks } from "../lib/catalog";
+import type { Progress } from "../lib/progress";
 import BookCard from "./BookCard";
 
-export default function Search() {
+export default function Search({ progress }: { progress: Progress }) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Audiobook[] | null>(null);
   const [readAlongOnly, setReadAlongOnly] = useState(false);
@@ -59,7 +60,12 @@ export default function Search() {
       {shown && (
         <div className="shelf-grid">
           {shown.map((book) => (
-            <BookCard key={book.id} book={book} />
+            <BookCard
+              key={book.id}
+              book={book}
+              hidden={progress.isHidden(book.id)}
+              onToggleHidden={progress.toggleHidden}
+            />
           ))}
         </div>
       )}
