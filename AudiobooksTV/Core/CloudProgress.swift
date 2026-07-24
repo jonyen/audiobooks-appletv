@@ -18,11 +18,21 @@ struct CloudProgress: Equatable {
     var positions: [String: CloudPosition]
     var finishedMarks: [String: Double]
     var unfinishedMarks: [String: Double]
+    var hiddenMarks: [String: Double]
+    var unhiddenMarks: [String: Double]
 
-    static let empty = CloudProgress(positions: [:], finishedMarks: [:], unfinishedMarks: [:])
+    static let empty = CloudProgress(
+        positions: [:], finishedMarks: [:], unfinishedMarks: [:],
+        hiddenMarks: [:], unhiddenMarks: [:]
+    )
 
     static func sectionKey(bookID: Int, sectionIndex: Int) -> String {
         "\(bookID)#\(sectionIndex)"
+    }
+
+    /// Key for the per-book hidden maps; matches the `positions` map's keys.
+    static func bookKey(bookID: Int) -> String {
+        String(bookID)
     }
 
     func isFinished(bookID: Int, sectionIndex: Int) -> Bool {
@@ -30,6 +40,15 @@ struct CloudProgress: Equatable {
         guard let finished = finishedMarks[key] else { return false }
         guard let unfinished = unfinishedMarks[key] else { return true }
         return finished > unfinished
+    }
+
+    /// Hidden iff the hide mark is newer than any unhide mark — the same
+    /// rule as finished sections, keyed by book instead of section.
+    func isHidden(bookID: Int) -> Bool {
+        let key = Self.bookKey(bookID: bookID)
+        guard let hidden = hiddenMarks[key] else { return false }
+        guard let unhidden = unhiddenMarks[key] else { return true }
+        return hidden > unhidden
     }
 
     /// The newer of two positions by updatedAt. Exact-tie comparisons fall
@@ -52,7 +71,9 @@ struct CloudProgress: Equatable {
         return CloudProgress(
             positions: positions,
             finishedMarks: a.finishedMarks.merging(b.finishedMarks, uniquingKeysWith: max),
-            unfinishedMarks: a.unfinishedMarks.merging(b.unfinishedMarks, uniquingKeysWith: max)
+            unfinishedMarks: a.unfinishedMarks.merging(b.unfinishedMarks, uniquingKeysWith: max),
+            hiddenMarks: a.hiddenMarks.merging(b.hiddenMarks, uniquingKeysWith: max),
+            unhiddenMarks: a.unhiddenMarks.merging(b.unhiddenMarks, uniquingKeysWith: max)
         )
     }
 
@@ -61,7 +82,8 @@ struct CloudProgress: Equatable {
     /// Local store state → cloud form for the first-sign-in upload.
     /// Finished sets have no local timestamps; they upload as marks at `now`.
     static func fromLocal(
-        items: [PlaybackProgress], finished: [Int: Set<Int>], now: Date = Date()
+        items: [PlaybackProgress], finished: [Int: Set<Int>], hidden: Set<Int>,
+        now: Date = Date()
     ) -> CloudProgress {
         var positions: [String: CloudPosition] = [:]
         for item in items {
@@ -80,7 +102,14 @@ struct CloudProgress: Equatable {
                 marks[sectionKey(bookID: bookID, sectionIndex: section)] = ms
             }
         }
-        return CloudProgress(positions: positions, finishedMarks: marks, unfinishedMarks: [:])
+        var hiddenMarks: [String: Double] = [:]
+        for bookID in hidden {
+            hiddenMarks[bookKey(bookID: bookID)] = ms
+        }
+        return CloudProgress(
+            positions: positions, finishedMarks: marks, unfinishedMarks: [:],
+            hiddenMarks: hiddenMarks, unhiddenMarks: [:]
+        )
     }
 
     /// Cloud positions as the local Continue Listening list: newest first,
@@ -114,6 +143,16 @@ struct CloudProgress: Equatable {
         return result
     }
 
+    /// Effective hidden books (marks minus newer tombstones).
+    var localHidden: Set<Int> {
+        var result: Set<Int> = []
+        for key in hiddenMarks.keys {
+            guard let bookID = Int(key), isHidden(bookID: bookID) else { continue }
+            result.insert(bookID)
+        }
+        return result
+    }
+
     // MARK: Firestore payload conversion (kept Firebase-free for testability)
 
     static func fromDictionary(_ dict: [String: Any]) -> CloudProgress {
@@ -137,6 +176,8 @@ struct CloudProgress: Equatable {
         }
         progress.finishedMarks = Self.numberMap(dict["finishedMarks"])
         progress.unfinishedMarks = Self.numberMap(dict["unfinishedMarks"])
+        progress.hiddenMarks = Self.numberMap(dict["hiddenMarks"])
+        progress.unhiddenMarks = Self.numberMap(dict["unhiddenMarks"])
         return progress
     }
 
@@ -161,6 +202,8 @@ struct CloudProgress: Equatable {
             "positions": rawPositions,
             "finishedMarks": finishedMarks,
             "unfinishedMarks": unfinishedMarks,
+            "hiddenMarks": hiddenMarks,
+            "unhiddenMarks": unhiddenMarks,
         ]
     }
 }

@@ -42,7 +42,7 @@ final class StoreHookTests: XCTestCase {
 
         let progress = PlaybackProgress(bookID: 9, bookTitle: "R", coverURL: nil,
                                         sectionIndex: 1, seconds: 30, updatedAt: Date())
-        store.applyRemote(items: [progress], finished: [9: [1]])
+        store.applyRemote(items: [progress], finished: [9: [1]], hidden: [])
 
         XCTAssertFalse(hookFired)
         XCTAssertEqual(store.progress(for: 9)?.seconds, 30)
@@ -50,6 +50,39 @@ final class StoreHookTests: XCTestCase {
 
         let reloaded = ProgressStore(defaults: defaults)
         XCTAssertEqual(reloaded.progress(for: 9)?.seconds, 30)
+    }
+
+    func testToggleHiddenFiresHooksAndPersists() {
+        let suite = "test.hidden.\(UUID().uuidString)"
+        let store = ProgressStore(defaults: UserDefaults(suiteName: suite)!)
+        var marked: [Int] = []
+        var unmarked: [Int] = []
+        store.onHiddenMarked = { marked.append($0) }
+        store.onHiddenUnmarked = { unmarked.append($0) }
+
+        XCTAssertFalse(store.isHidden(bookID: 52))
+        store.toggleHidden(bookID: 52)
+        XCTAssertTrue(store.isHidden(bookID: 52))
+        store.toggleHidden(bookID: 52)
+        XCTAssertFalse(store.isHidden(bookID: 52))
+        XCTAssertEqual(marked, [52])
+        XCTAssertEqual(unmarked, [52])
+
+        store.toggleHidden(bookID: 7)
+        let reloaded = ProgressStore(defaults: UserDefaults(suiteName: suite)!)
+        XCTAssertTrue(reloaded.isHidden(bookID: 7))
+    }
+
+    func testApplyRemoteHiddenFiresNoHooks() {
+        let store = ProgressStore(defaults: freshDefaults())
+        var fired = false
+        store.onHiddenMarked = { _ in fired = true }
+        store.onHiddenUnmarked = { _ in fired = true }
+
+        store.applyRemote(items: [], finished: [:], hidden: [52])
+
+        XCTAssertFalse(fired)
+        XCTAssertTrue(store.isHidden(bookID: 52))
     }
 
     func testPreambleStoreHookAndApplyRemote() {

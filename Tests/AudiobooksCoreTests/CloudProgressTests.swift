@@ -63,7 +63,7 @@ final class CloudProgressTests: XCTestCase {
         let items = [PlaybackProgress(bookID: 52, bookTitle: "Pride", coverURL: nil,
                                       sectionIndex: 3, seconds: 42,
                                       updatedAt: Date(timeIntervalSince1970: 1000))]
-        let cloud = CloudProgress.fromLocal(items: items, finished: [52: [0, 3]], now: now)
+        let cloud = CloudProgress.fromLocal(items: items, finished: [52: [0, 3]], hidden: [], now: now)
         XCTAssertEqual(cloud.positions["52"]?.updatedAt, 1_000_000) // ms epoch
         XCTAssertEqual(cloud.finishedMarks["52#0"], 2_000_000)
         XCTAssertEqual(cloud.finishedMarks["52#3"], 2_000_000)
@@ -102,5 +102,66 @@ final class CloudProgressTests: XCTestCase {
         // A position without required numeric fields is dropped; bad marks too.
         XCTAssertTrue(decoded.positions.isEmpty)
         XCTAssertEqual(decoded.finishedMarks, ["52#3": 100.0])
+    }
+
+    func testBookKeyMatchesPositionsKey() {
+        XCTAssertEqual(CloudProgress.bookKey(bookID: 52), "52")
+    }
+
+    func testIsHiddenMarkTombstoneSemantics() {
+        var state = CloudProgress.empty
+        XCTAssertFalse(state.isHidden(bookID: 52))
+        state.hiddenMarks["52"] = 100
+        XCTAssertTrue(state.isHidden(bookID: 52))
+        state.unhiddenMarks["52"] = 200
+        XCTAssertFalse(state.isHidden(bookID: 52))
+        state.hiddenMarks["52"] = 300
+        XCTAssertTrue(state.isHidden(bookID: 52))
+    }
+
+    func testMergeTakesPerKeyMaximumsOfHiddenMarks() {
+        var a = CloudProgress.empty
+        a.hiddenMarks = ["1": 100, "52": 300]
+        a.unhiddenMarks = ["52": 200]
+        var b = CloudProgress.empty
+        b.hiddenMarks = ["2": 150, "52": 250]
+        b.unhiddenMarks = ["52": 400]
+        let merged = CloudProgress.merge(a, b)
+        XCTAssertEqual(merged.hiddenMarks, ["1": 100, "2": 150, "52": 300])
+        XCTAssertEqual(merged.unhiddenMarks, ["52": 400])
+        XCTAssertTrue(merged.isHidden(bookID: 1))
+        XCTAssertFalse(merged.isHidden(bookID: 52))
+    }
+
+    func testStaleUnhideCannotResurrectNewerHide() {
+        var a = CloudProgress.empty
+        a.hiddenMarks["52"] = 300
+        a.unhiddenMarks["52"] = 200
+        var b = CloudProgress.empty
+        b.hiddenMarks["52"] = 100
+        b.unhiddenMarks["52"] = 200
+        XCTAssertTrue(CloudProgress.merge(a, b).isHidden(bookID: 52))
+    }
+
+    func testFromLocalUploadsHiddenAtNow() {
+        let now = Date(timeIntervalSince1970: 2000)
+        let cloud = CloudProgress.fromLocal(items: [], finished: [:], hidden: [52, 7], now: now)
+        XCTAssertEqual(cloud.hiddenMarks["52"], 2_000_000)
+        XCTAssertEqual(cloud.hiddenMarks["7"], 2_000_000)
+        XCTAssertEqual(cloud.localHidden, [7, 52])
+    }
+
+    func testLocalHiddenExcludesNewerUnhides() {
+        var cloud = CloudProgress.empty
+        cloud.hiddenMarks = ["52": 100, "7": 100]
+        cloud.unhiddenMarks = ["7": 200]
+        XCTAssertEqual(cloud.localHidden, [52])
+    }
+
+    func testDictionaryRoundTripCarriesHiddenMaps() {
+        var cloud = CloudProgress.empty
+        cloud.hiddenMarks["52"] = 100
+        cloud.unhiddenMarks["7"] = 200
+        XCTAssertEqual(CloudProgress.fromDictionary(cloud.asDictionary), cloud)
     }
 }

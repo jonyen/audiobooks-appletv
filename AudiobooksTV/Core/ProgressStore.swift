@@ -16,11 +16,14 @@ final class ProgressStore: ObservableObject {
     static let shared = ProgressStore()
     private static let key = "playbackProgress.v1"
     private static let finishedKey = "finishedSections.v1"
+    private static let hiddenKey = "hiddenBooks.v1"
     private static let cap = 20
 
     @Published private(set) var items: [PlaybackProgress] = []
     /// Finished section indexes per book ID. Feeds gold section titles.
     @Published private(set) var finished: [Int: Set<Int>] = [:]
+    /// Book IDs hidden from the Home shelves. Search still shows them.
+    @Published private(set) var hidden: Set<Int> = []
     private let defaults: UserDefaults
 
     /// Cloud-mirror hooks. Fired for user-driven changes only — never for
@@ -28,6 +31,8 @@ final class ProgressStore: ObservableObject {
     var onPositionSaved: ((PlaybackProgress) -> Void)?
     var onFinishedMarked: ((Int, Int) -> Void)?
     var onFinishedUnmarked: ((Int, Int) -> Void)?
+    var onHiddenMarked: ((Int) -> Void)?
+    var onHiddenUnmarked: ((Int) -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -38,6 +43,10 @@ final class ProgressStore: ObservableObject {
         if let data = defaults.data(forKey: Self.finishedKey),
            let decoded = try? JSONDecoder().decode([Int: Set<Int>].self, from: data) {
             finished = decoded
+        }
+        if let data = defaults.data(forKey: Self.hiddenKey),
+           let decoded = try? JSONDecoder().decode(Set<Int>.self, from: data) {
+            hidden = decoded
         }
     }
 
@@ -89,13 +98,31 @@ final class ProgressStore: ObservableObject {
         }
     }
 
+    func isHidden(bookID: Int) -> Bool {
+        hidden.contains(bookID)
+    }
+
+    func toggleHidden(bookID: Int) {
+        if hidden.contains(bookID) {
+            hidden.remove(bookID)
+            persistHidden()
+            onHiddenUnmarked?(bookID)
+        } else {
+            hidden.insert(bookID)
+            persistHidden()
+            onHiddenMarked?(bookID)
+        }
+    }
+
     /// Applies remotely-merged state: publishes and persists without firing
     /// the cloud hooks (the change came FROM the cloud).
-    func applyRemote(items: [PlaybackProgress], finished: [Int: Set<Int>]) {
+    func applyRemote(items: [PlaybackProgress], finished: [Int: Set<Int>], hidden: Set<Int>) {
         self.items = items
         self.finished = finished
+        self.hidden = hidden
         persist()
         persistFinished()
+        persistHidden()
     }
 
     private func persist() {
@@ -107,6 +134,12 @@ final class ProgressStore: ObservableObject {
     private func persistFinished() {
         if let data = try? JSONEncoder().encode(finished) {
             defaults.set(data, forKey: Self.finishedKey)
+        }
+    }
+
+    private func persistHidden() {
+        if let data = try? JSONEncoder().encode(hidden) {
+            defaults.set(data, forKey: Self.hiddenKey)
         }
     }
 }
