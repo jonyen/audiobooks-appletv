@@ -29,7 +29,8 @@ export default function Player({
   const initialSeconds = parseInt(search.get("t") ?? "0", 10) || 0;
 
   const [book, setBook] = useState<Audiobook | null | "loading" | "error">("loading");
-  const [bookText, setBookText] = useState<BookText | null | "loading">("loading");
+  const [bookText, setBookText] = useState<BookText | null | "loading" | "error">("loading");
+  const [textReloadKey, setTextReloadKey] = useState(0);
   const [sectionIndex, setSectionIndex] = useState(initialSection);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -54,21 +55,22 @@ export default function Player({
         if (cancelled) return;
         setBook(b ?? "error");
         if (b) {
+          setBookText("loading");
           loadBookText(b)
             .then((t) => !cancelled && setBookText(t))
-            .catch(() => !cancelled && setBookText(null));
+            .catch(() => !cancelled && setBookText("error"));
         }
       })
       .catch(() => !cancelled && setBook("error"));
     return () => {
       cancelled = true;
     };
-  }, [bookID]);
+  }, [bookID, textReloadKey]);
 
   const loadedBook = typeof book === "object" && book !== null ? book : null;
   const currentSection = loadedBook?.sections[sectionIndex] ?? null;
   const chapter =
-    loadedBook && bookText !== "loading" && bookText !== null
+    loadedBook && bookText !== "loading" && bookText !== "error" && bookText !== null
       ? chapterForSection(bookText, sectionIndex)
       : null;
   const paragraphs = useMemo(
@@ -95,6 +97,11 @@ export default function Player({
     },
     [loadedBook, sectionIndex, progress]
   );
+
+  // Latest-callback ref so the unmount-save effect below can run exactly
+  // once (on true unmount) without re-subscribing on every section change.
+  const savePositionRef = useRef(savePosition);
+  savePositionRef.current = savePosition;
 
   /** Seek past the preamble only when sane: duration known, offset ≤ half
    * the section, playback not already past it. */
@@ -149,6 +156,15 @@ export default function Player({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedBook, sectionIndex, currentSection]);
 
+  // Synced offsets can arrive after the section starts (cold load, or another
+  // device analyzed first): apply them to the timeline as they land. Never
+  // seeks — seeking stays in the fresh-start analysis path.
+  useEffect(() => {
+    if (!loadedBook) return;
+    const cached = preambles.offset(preambleSectionID(loadedBook.id, sectionIndex));
+    if (cached !== undefined && cached > 0) setPreambleOffset(cached);
+  }, [loadedBook, sectionIndex, preambles]);
+
   // Manual scroll suspends auto-follow.
   useEffect(() => {
     const suspend = () => {
@@ -179,14 +195,16 @@ export default function Player({
     });
   }, [currentParagraphIndex, playing]);
 
-  // Save on unmount.
+  // Save on unmount only (section changes are saved explicitly by
+  // changeSection). Empty deps + a latest-callback ref keep this from
+  // firing on every section transition, when audioRef would already point
+  // at the newly-remounted <audio> for the next section.
   useEffect(() => {
     return () => {
       const audio = audioRef.current;
-      if (audio && audio.currentTime > 0) savePosition(audio.currentTime);
+      if (audio && audio.currentTime > 0) savePositionRef.current(audio.currentTime);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savePosition]);
+  }, []);
 
   if (book === "loading") return <main className="player"><p className="dim">Loading…</p></main>;
   if (book === "error" || !loadedBook || !currentSection) {
@@ -302,7 +320,7 @@ export default function Player({
             </p>
           ))}
         </div>
-      ) : bookText !== "loading" && bookText !== null ? (
+      ) : bookText !== "loading" && bookText !== "error" && bookText !== null ? (
         <div className="reader">
           <p className="dim">This chapter couldn't be matched — showing the full book text.</p>
           {bookText.chapters.map((c, i) => (
@@ -314,6 +332,11 @@ export default function Player({
         </div>
       ) : bookText === "loading" ? (
         <p className="dim reader">Loading text…</p>
+      ) : bookText === "error" ? (
+        <div className="reader">
+          <p className="error">The book text could not be loaded.</p>
+          <button onClick={() => setTextReloadKey((k) => k + 1)}>Try Again</button>
+        </div>
       ) : (
         <div className="cover-only">
           {loadedBook.coverURL && <img src={loadedBook.coverURL} alt="" />}
