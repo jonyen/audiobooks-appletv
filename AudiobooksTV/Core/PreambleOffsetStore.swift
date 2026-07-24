@@ -22,6 +22,9 @@ final class PreambleOffsetStore {
         offsets[sectionID]
     }
 
+    /// All cached offsets, for the cloud mirror's first-sign-in upload.
+    var allOffsets: [String: Double] { offsets }
+
     func save(offset: Double, sectionID: String) {
         offsets[sectionID] = offset
         defaults.set(offsets, forKey: Self.key)

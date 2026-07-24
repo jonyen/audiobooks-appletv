@@ -67,4 +67,13 @@ final class StoreHookTests: XCTestCase {
         XCTAssertEqual(store.offset(sectionID: "52.3"), 12.5)
         XCTAssertEqual(store.offset(sectionID: "52.4"), 0)
     }
+
+    func testAllOffsetsExposesCachedOffsets() {
+        let suite = "test.alloffsets.\(UUID().uuidString)"
+        let store = PreambleOffsetStore(defaults: UserDefaults(suiteName: suite)!)
+        XCTAssertEqual(store.allOffsets, [:])
+        store.save(offset: 12.5, sectionID: "52.3")
+        store.save(offset: 0, sectionID: "52.4")
+        XCTAssertEqual(store.allOffsets, ["52.3": 12.5, "52.4": 0])
+    }
 }

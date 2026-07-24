@@ -72,9 +72,15 @@ final class CloudProgressMirror {
         let localCloud = CloudProgress.fromLocal(items: store.items, finished: store.finished)
         progressDoc?.setData(localCloud.asDictionary, merge: true)
 
+        let localOffsets = preambles.allOffsets
+        if !localOffsets.isEmpty {
+            preambleDoc?.setData(["offsets": localOffsets], merge: true)
+        }
+
         progressListener = progressDoc?.addSnapshotListener { [weak self] snapshot, _ in
             guard let self, let data = snapshot?.data() else { return }
             Task { @MainActor in
+                guard Auth.auth().currentUser != nil else { return }
                 let remote = CloudProgress.fromDictionary(data)
                 let merged = CloudProgress.merge(self.lastKnown, remote)
                 guard merged != self.lastKnown else { return }
@@ -88,6 +94,7 @@ final class CloudProgressMirror {
             guard let offsets = snapshot?.data()?["offsets"] as? [String: Any] else { return }
             let numeric = offsets.compactMapValues { $0 as? Double ?? ($0 as? Int).map(Double.init) }
             Task { @MainActor in
+                guard Auth.auth().currentUser != nil else { return }
                 PreambleOffsetStore.shared.applyRemote(offsets: numeric)
             }
         }
