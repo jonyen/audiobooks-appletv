@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { signInWithApple } from "../lib/firebase";
+import { signInWithGoogle } from "../lib/firebase";
 
 export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
@@ -7,14 +7,14 @@ export default function SignIn() {
   return (
     <main className="signin">
       <h1>Audiobooks — Read Along</h1>
-      <p>Sign in to listen, read along, and keep your progress in sync with Apple TV.</p>
+      <p>Sign in to listen, read along, and keep your progress in sync with Apple TV and the web.</p>
       <button
         onClick={() => {
           setError(null);
-          signInWithApple().catch((e: Error) => setError(e.message));
+          signInWithGoogle().catch((e: Error) => setError(e.message));
         }}
       >
-         Sign in with Apple
+        Sign in with Google
       </button>
       {error && <p className="error">{error}</p>}
     </main>

@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import {
-  OAuthProvider,
+  GoogleAuthProvider,
   getAuth,
   onAuthStateChanged,
   signInWithPopup,
@@ -20,8 +20,8 @@ const app = initializeApp({
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 
-export async function signInWithApple(): Promise<void> {
-  await signInWithPopup(auth, new OAuthProvider("apple.com"));
+export async function signInWithGoogle(): Promise<void> {
+  await signInWithPopup(auth, new GoogleAuthProvider());
 }
 
 export function signOutUser(): Promise<void> {

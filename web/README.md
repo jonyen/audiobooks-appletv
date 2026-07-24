@@ -1,7 +1,7 @@
 # Audiobooks Web
 
 React + Vite web port of AudiobooksTV: browse LibriVox, read along with
-Project Gutenberg text, synced progress via Sign in with Apple + Firestore.
+Project Gutenberg text, synced progress via Google sign-in + Firestore.
 
 ## Local development
 
@@ -27,21 +27,21 @@ you need the LibriVox/Gutenberg proxy.
    ```
 
    then deploy: `npx firebase-tools deploy --only firestore:rules`.
-3. **Sign in with Apple** (requires an Apple Developer account):
-   - developer.apple.com → Identifiers → create a **Services ID**
-     (e.g. `com.example.audiobooks.web`), enable "Sign in with Apple",
-     configure the web domain and the Firebase return URL
-     (`https://<project>.firebaseapp.com/__/auth/handler`).
-   - Create a **Sign in with Apple key**, note the Key ID and Team ID.
-   - Firebase console → Authentication → Sign-in method → Apple: enable,
-     fill in Services ID, Team ID, Key ID, and the key file contents.
+3. **Google sign-in**:
+   - Firebase console → Authentication → Sign-in method → **Google**: enable
+     it (no keys needed for the web popup).
+   - For the Apple TV app's QR sign-in: Google Cloud console (same project)
+     → APIs & Services → Credentials → Create Credentials → OAuth client ID
+     → type **TVs and Limited Input Devices**. Copy the client ID and secret
+     into `AudiobooksTV/GoogleTVClient.plist` (see
+     `AudiobooksTV/GoogleTVClient.example.plist`; the real file is
+     gitignored).
 4. **Cloudflare Pages**: create a Pages project from this repo
    (root directory `web`, build command `npm run build`, output `dist`) or
    deploy manually with `npx wrangler pages deploy dist`. Set the four
    `VITE_FIREBASE_*` environment variables in the Pages project settings.
 5. Add the Pages domain (`*.pages.dev` and any custom domain) to Firebase
-   Authentication → Settings → Authorized domains, and to the Apple
-   Services ID's web domains.
+   Authentication → Settings → Authorized domains.
 
 ## Architecture notes
 
