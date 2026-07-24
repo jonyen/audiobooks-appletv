@@ -16,6 +16,11 @@ final class AccountModel: ObservableObject {
     }
 
     @Published private(set) var user: FirebaseAuth.User?
+    /// False until Firebase reports its first auth state, which it does
+    /// asynchronously after restoring any persisted session. Lets the
+    /// sign-in gate tell "still restoring" from "signed out" instead of
+    /// flashing the sign-in screen on every launch.
+    @Published private(set) var didResolveInitialUser = false
     /// Non-nil while a device-flow pairing is awaiting phone approval.
     @Published private(set) var pairing: Pairing?
     @Published var errorMessage: String?
@@ -41,8 +46,11 @@ final class AccountModel: ObservableObject {
 
     private init() {
         guard FirebaseApp.app() != nil else { return }
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            Task { @MainActor in self?.user = user }
+        _ = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            Task { @MainActor in
+                self?.user = user
+                self?.didResolveInitialUser = true
+            }
         }
     }
 

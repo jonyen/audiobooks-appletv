@@ -51,7 +51,7 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showAccount) {
-            AccountView()
+            AccountView(onDone: { showAccount = false })
         }
     }
 

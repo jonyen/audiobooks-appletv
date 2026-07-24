@@ -60,9 +60,13 @@ Three pieces:
   Google identity and Firebase `uid` as the web app. The TV client ID and
   secret load from a gitignored `GoogleTVClient.plist` (Google treats
   limited-input client secrets as non-confidential, but the repo is public,
-  so they stay out of git); absent that file, sign-in is unavailable and
-  the app runs local-only. Sign-in remains **optional**: signed out, the
-  app behaves exactly as today with local `UserDefaults` state.
+  so they stay out of git). Sign-in is **required** on tvOS too: signed
+  out, a gate screen replaces the library, matching the web app (amended
+  2026-07-24 — sign-in was optional when it depended on a paid Apple
+  entitlement that might never be configured). The one exception is a build
+  missing either plist, where signing in is impossible: it falls back to
+  the local-only library rather than becoming a dead end, so a fresh clone
+  of this public repo still runs.
 
 ## Data model & sync
 
@@ -173,7 +177,9 @@ Kept minimal:
   existing public APIs: writes always go to `UserDefaults`, additionally to
   Firestore when signed in; snapshot listeners apply remote changes using
   the merge rules.
-- No behavior change when signed out.
+- A root gate view shows the sign-in screen instead of the library while
+  signed out, and falls back to the local-only library when sync isn't
+  configured in the build.
 
 ## Error handling
 

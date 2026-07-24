@@ -4,8 +4,11 @@ import SwiftUI
 /// Sign in with Google (device flow) to sync listening progress with the
 /// web app: shows a short code + QR, approved on the user's phone.
 struct AccountView: View {
+    /// Dismisses the in-app account sheet. Nil at the sign-in gate, where
+    /// there is nothing behind this screen to return to.
+    var onDone: (() -> Void)?
+
     @ObservedObject private var account = AccountModel.shared
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 32) {
@@ -47,8 +50,10 @@ struct AccountView: View {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
 
-            Button("Done") { dismiss() }
-                .foregroundStyle(.secondary)
+            if let onDone {
+                Button("Done") { onDone() }
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(64)
         .onDisappear { account.cancelSignIn() }
