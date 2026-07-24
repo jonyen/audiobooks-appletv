@@ -25,6 +25,31 @@ export function emptyProgress(): ProgressState {
   return { positions: {}, finishedMarks: {}, unfinishedMarks: {} };
 }
 
+/**
+ * Positions as stored in Firestore, normalized: the map key is the
+ * authoritative bookID (tvOS writes no embedded bookID field), so inject
+ * it from the key and never trust the embedded value.
+ */
+export function positionsFromSnapshot(raw: unknown): Record<string, PlaybackPosition> {
+  const positions: Record<string, PlaybackPosition> = {};
+  if (typeof raw !== "object" || raw === null) return positions;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const bookID = Number(key);
+    if (!Number.isInteger(bookID) || typeof value !== "object" || value === null) continue;
+    const v = value as Partial<PlaybackPosition>;
+    if (typeof v.seconds !== "number" || typeof v.updatedAt !== "number" || typeof v.sectionIndex !== "number") continue;
+    positions[key] = {
+      bookID,
+      bookTitle: typeof v.bookTitle === "string" ? v.bookTitle : "",
+      coverURL: typeof v.coverURL === "string" ? v.coverURL : null,
+      sectionIndex: v.sectionIndex,
+      seconds: v.seconds,
+      updatedAt: v.updatedAt,
+    };
+  }
+  return positions;
+}
+
 export function sectionKey(bookID: number, sectionIndex: number): string {
   return `${bookID}#${sectionIndex}`;
 }

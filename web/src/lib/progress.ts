@@ -7,6 +7,7 @@ import {
   isFinished as stateIsFinished,
   mergeOffsets,
   mergeProgress,
+  positionsFromSnapshot,
   sectionKey,
   type PlaybackPosition,
   type ProgressState,
@@ -37,7 +38,7 @@ export function useProgress(uid: string): Progress {
     return onSnapshot(ref, (snapshot) => {
       const data = (snapshot.data() ?? {}) as Partial<ProgressState>;
       const remote: ProgressState = {
-        positions: data.positions ?? {},
+        positions: positionsFromSnapshot((data as Record<string, unknown>).positions),
         finishedMarks: data.finishedMarks ?? {},
         unfinishedMarks: data.unfinishedMarks ?? {},
       };

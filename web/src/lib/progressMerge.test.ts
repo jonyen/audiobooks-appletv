@@ -5,6 +5,7 @@ import {
   isFinished,
   mergeOffsets,
   mergeProgress,
+  positionsFromSnapshot,
   preambleSectionID,
   sectionKey,
   type PlaybackPosition,
@@ -78,6 +79,25 @@ test("offsets merge as a union with existing values preserved", () => {
     "52.3": 14.5,
     "52.4": 0,
   });
+});
+
+test("positionsFromSnapshot injects bookID from the map key (tvOS writes none)", () => {
+  const raw = {
+    "52": { bookTitle: "Pride", coverURL: null, sectionIndex: 3, seconds: 42, updatedAt: 1000 },
+    "bad": { bookTitle: "X", sectionIndex: 0, seconds: 1, updatedAt: 1 },
+    "7": "not-an-object",
+  };
+  const positions = positionsFromSnapshot(raw);
+  expect(Object.keys(positions)).toEqual(["52"]);
+  expect(positions["52"].bookID).toBe(52);
+  expect(continueListening({ ...emptyProgress(), positions })[0].bookID).toBe(52);
+});
+
+test("positionsFromSnapshot never trusts an embedded bookID", () => {
+  const positions = positionsFromSnapshot({
+    "52": { bookID: 999, bookTitle: "Pride", coverURL: null, sectionIndex: 3, seconds: 42, updatedAt: 1000 },
+  });
+  expect(positions["52"].bookID).toBe(52);
 });
 
 test("position merge is commutative on an exact updatedAt tie", () => {
