@@ -23,6 +23,12 @@ final class ProgressStore: ObservableObject {
     @Published private(set) var finished: [Int: Set<Int>] = [:]
     private let defaults: UserDefaults
 
+    /// Cloud-mirror hooks. Fired for user-driven changes only — never for
+    /// applyRemote — so a remote echo can't loop back into another write.
+    var onPositionSaved: ((PlaybackProgress) -> Void)?
+    var onFinishedMarked: ((Int, Int) -> Void)?
+    var onFinishedUnmarked: ((Int, Int) -> Void)?
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.key),
@@ -42,6 +48,7 @@ final class ProgressStore: ObservableObject {
             items.removeLast(items.count - Self.cap)
         }
         persist()
+        onPositionSaved?(progress)
     }
 
     func progress(for bookID: Int) -> PlaybackProgress? {
@@ -64,6 +71,7 @@ final class ProgressStore: ObservableObject {
     func markFinished(bookID: Int, sectionIndex: Int) {
         finished[bookID, default: []].insert(sectionIndex)
         persistFinished()
+        onFinishedMarked?(bookID, sectionIndex)
     }
 
     func toggleFinished(bookID: Int, sectionIndex: Int) {
@@ -72,9 +80,21 @@ final class ProgressStore: ObservableObject {
             if finished[bookID]?.isEmpty == true {
                 finished.removeValue(forKey: bookID)
             }
+            persistFinished()
+            onFinishedUnmarked?(bookID, sectionIndex)
         } else {
             finished[bookID, default: []].insert(sectionIndex)
+            persistFinished()
+            onFinishedMarked?(bookID, sectionIndex)
         }
+    }
+
+    /// Applies remotely-merged state: publishes and persists without firing
+    /// the cloud hooks (the change came FROM the cloud).
+    func applyRemote(items: [PlaybackProgress], finished: [Int: Set<Int>]) {
+        self.items = items
+        self.finished = finished
+        persist()
         persistFinished()
     }
 

@@ -8,7 +8,7 @@ struct AudiobooksTVApp: App {
         // as before, local-only.
         if Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil {
             FirebaseApp.configure()
-            // CloudProgressMirror.shared.start() // enabled in Task 19
+            CloudProgressMirror.shared.start()
         }
     }
 

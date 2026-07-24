@@ -10,6 +10,9 @@ final class PreambleOffsetStore {
     private var offsets: [String: Double]
     private let defaults: UserDefaults
 
+    /// Cloud-mirror hook: fired for locally-detected offsets only.
+    var onSaved: ((String, Double) -> Void)?
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         offsets = (defaults.dictionary(forKey: Self.key) as? [String: Double]) ?? [:]
@@ -21,6 +24,14 @@ final class PreambleOffsetStore {
 
     func save(offset: Double, sectionID: String) {
         offsets[sectionID] = offset
+        defaults.set(offsets, forKey: Self.key)
+        onSaved?(sectionID, offset)
+    }
+
+    /// Merges remote offsets in. Existing local values win (offsets are
+    /// facts about the audio; concurrent values are equivalent). No hook.
+    func applyRemote(offsets remote: [String: Double]) {
+        offsets = remote.merging(offsets) { _, local in local }
         defaults.set(offsets, forKey: Self.key)
     }
 }
