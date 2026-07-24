@@ -47,27 +47,38 @@ export default function Player({
   const lastSavedRef = useRef(0);
   const followSuspendedUntilRef = useRef(0);
 
-  // Load book + text once.
+  const loadedBook = typeof book === "object" && book !== null ? book : null;
+
+  // Load the book once per bookID. Kept independent from text loading so a
+  // text-only retry never re-fetches (and never re-identifies) the book —
+  // that identity feeds the preamble effect's deps, and a fresh object there
+  // would look like a section change and re-trigger analysis mid-playback.
   useEffect(() => {
     let cancelled = false;
     bookByID(bookID)
-      .then((b) => {
-        if (cancelled) return;
-        setBook(b ?? "error");
-        if (b) {
-          setBookText("loading");
-          loadBookText(b)
-            .then((t) => !cancelled && setBookText(t))
-            .catch(() => !cancelled && setBookText("error"));
-        }
-      })
+      .then((b) => !cancelled && setBook(b ?? "error"))
       .catch(() => !cancelled && setBook("error"));
     return () => {
       cancelled = true;
     };
-  }, [bookID, textReloadKey]);
+  }, [bookID]);
 
-  const loadedBook = typeof book === "object" && book !== null ? book : null;
+  // Load (and retry) the book text once the book itself has resolved. Keyed
+  // on textReloadKey so "Try Again" only redoes this fetch, not the book
+  // fetch above.
+  useEffect(() => {
+    if (!loadedBook) return;
+    let cancelled = false;
+    setBookText("loading");
+    loadBookText(loadedBook)
+      .then((t) => !cancelled && setBookText(t))
+      .catch(() => !cancelled && setBookText("error"));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedBook, textReloadKey]);
+
   const currentSection = loadedBook?.sections[sectionIndex] ?? null;
   const chapter =
     loadedBook && bookText !== "loading" && bookText !== "error" && bookText !== null
