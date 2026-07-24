@@ -41,6 +41,8 @@ export function useProgress(uid: string): Progress {
         positions: positionsFromSnapshot((data as Record<string, unknown>).positions),
         finishedMarks: data.finishedMarks ?? {},
         unfinishedMarks: data.unfinishedMarks ?? {},
+        hiddenMarks: data.hiddenMarks ?? {},
+        unhiddenMarks: data.unhiddenMarks ?? {},
       };
       setState((local) => mergeProgress(local, remote));
     });

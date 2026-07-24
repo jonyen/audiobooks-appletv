@@ -1,8 +1,10 @@
 import { expect, test } from "vitest";
 import {
+  bookKey,
   continueListening,
   emptyProgress,
   isFinished,
+  isHidden,
   mergeOffsets,
   mergeProgress,
   positionsFromSnapshot,
@@ -107,4 +109,47 @@ test("position merge is commutative on an exact updatedAt tie", () => {
   const ba = mergeProgress(b, a).positions["1"];
   expect(ab).toEqual(ba);
   expect(ab.seconds).toBe(99); // deterministic winner: greater seconds on tie
+});
+
+test("bookKey matches the positions map key format", () => {
+  expect(bookKey(52)).toBe("52");
+});
+
+test("isHidden: mark alone hides; newer unhide wins; newer re-hide wins back", () => {
+  expect(isHidden(emptyProgress(), 52)).toBe(false);
+  expect(isHidden(state({ hiddenMarks: { "52": 100 } }), 52)).toBe(true);
+  const unhidden = state({ hiddenMarks: { "52": 100 }, unhiddenMarks: { "52": 200 } });
+  expect(isHidden(unhidden, 52)).toBe(false);
+  const rehidden = state({ hiddenMarks: { "52": 300 }, unhiddenMarks: { "52": 200 } });
+  expect(isHidden(rehidden, 52)).toBe(true);
+});
+
+test("merge unions hidden marks taking per-key maximums", () => {
+  const a = state({ hiddenMarks: { "1": 100, "52": 300 }, unhiddenMarks: { "52": 200 } });
+  const b = state({ hiddenMarks: { "2": 150, "52": 250 }, unhiddenMarks: { "52": 400 } });
+  const merged = mergeProgress(a, b);
+  expect(merged.hiddenMarks).toEqual({ "1": 100, "2": 150, "52": 300 });
+  expect(merged.unhiddenMarks).toEqual({ "52": 400 });
+  expect(isHidden(merged, 1)).toBe(true);
+  expect(isHidden(merged, 52)).toBe(false); // unhide at 400 beats re-hide at 300
+});
+
+test("stale unhide cannot resurrect a newer hide through merge", () => {
+  const a = state({ hiddenMarks: { "52": 300 }, unhiddenMarks: { "52": 200 } });
+  const b = state({ hiddenMarks: { "52": 100 }, unhiddenMarks: { "52": 200 } });
+  expect(isHidden(mergeProgress(a, b), 52)).toBe(true);
+});
+
+test("hiding a book leaves its position and finished marks untouched", () => {
+  const merged = mergeProgress(
+    state({
+      positions: { "52": pos(52, 100, 42) },
+      finishedMarks: { "52#3": 100 },
+      hiddenMarks: { "52": 500 },
+    }),
+    emptyProgress()
+  );
+  expect(merged.positions["52"].seconds).toBe(42);
+  expect(merged.finishedMarks["52#3"]).toBe(100);
+  expect(isHidden(merged, 52)).toBe(true);
 });

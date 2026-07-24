@@ -1,10 +1,10 @@
 /**
  * Synced listening progress. Positions are last-writer-wins per book by
- * updatedAt. Finished sections are a mark/tombstone set: a section is
- * finished iff its finishedMarks timestamp is newer than any
- * unfinishedMarks timestamp for the same key. Marks are never deleted, so
- * merging any two device states always converges without resurrecting
- * undone changes.
+ * updatedAt. Finished sections and hidden books are mark/tombstone sets: a
+ * section is finished iff its finishedMarks timestamp is newer than any
+ * unfinishedMarks timestamp for the same key, and a book is hidden by the
+ * same rule keyed on book ID alone. Marks are never deleted, so merging any
+ * two device states always converges without resurrecting undone changes.
  */
 export interface PlaybackPosition {
   bookID: number;
@@ -19,10 +19,18 @@ export interface ProgressState {
   positions: Record<string, PlaybackPosition>;
   finishedMarks: Record<string, number>;
   unfinishedMarks: Record<string, number>;
+  hiddenMarks: Record<string, number>;
+  unhiddenMarks: Record<string, number>;
 }
 
 export function emptyProgress(): ProgressState {
-  return { positions: {}, finishedMarks: {}, unfinishedMarks: {} };
+  return {
+    positions: {},
+    finishedMarks: {},
+    unfinishedMarks: {},
+    hiddenMarks: {},
+    unhiddenMarks: {},
+  };
 }
 
 /**
@@ -52,6 +60,24 @@ export function positionsFromSnapshot(raw: unknown): Record<string, PlaybackPosi
 
 export function sectionKey(bookID: number, sectionIndex: number): string {
   return `${bookID}#${sectionIndex}`;
+}
+
+/** Key for the per-book hidden maps; matches the `positions` map's keys. */
+export function bookKey(bookID: number): string {
+  return String(bookID);
+}
+
+/**
+ * A book is hidden iff its hide mark is newer than any unhide mark — the
+ * same mark/tombstone rule as finished sections, so hide and unhide
+ * converge across devices without either side resurrecting the other.
+ */
+export function isHidden(state: ProgressState, bookID: number): boolean {
+  const key = bookKey(bookID);
+  const hidden = state.hiddenMarks[key];
+  if (hidden === undefined) return false;
+  const unhidden = state.unhiddenMarks[key];
+  return unhidden === undefined || hidden > unhidden;
 }
 
 /** MUST match the tvOS PreambleOffsetStore format: "\(book.id).\(sectionIndex)". */
@@ -97,6 +123,8 @@ export function mergeProgress(a: ProgressState, b: ProgressState): ProgressState
     positions,
     finishedMarks: maxByKey(a.finishedMarks, b.finishedMarks),
     unfinishedMarks: maxByKey(a.unfinishedMarks, b.unfinishedMarks),
+    hiddenMarks: maxByKey(a.hiddenMarks, b.hiddenMarks),
+    unhiddenMarks: maxByKey(a.unhiddenMarks, b.unhiddenMarks),
   };
 }
 
