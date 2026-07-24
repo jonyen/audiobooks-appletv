@@ -40,6 +40,12 @@ No API keys. Open `AudiobooksTV.xcodeproj` in Xcode 16 or later, select the
 
 Run the logic tests with `swift test` (macOS, no simulator needed).
 
+## Web version
+
+`web/` contains a React + Vite web port with the same read-along player and
+progress synced through Sign in with Apple + Firestore. See `web/README.md`
+for setup and deployment (Cloudflare Pages + Pages Functions).
+
 ## Project layout
 
 ```
